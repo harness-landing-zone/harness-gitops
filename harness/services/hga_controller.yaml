@@ -1,0 +1,39 @@
+service:
+  name: HGA Controller
+  identifier: hga_controller
+  orgIdentifier: gitops_reference
+  projectIdentifier: gitops_admin
+  description: Installs the HGA controller with Native Helm. Chart and values are fetched at one commit; the image tag is a run-time input.
+  tags:
+    purpose: platform-cd
+  serviceDefinition:
+    type: NativeHelm
+    spec:
+      manifests:
+        - manifest:
+            identifier: controller_chart
+            type: HelmChart
+            spec:
+              store:
+                type: Github
+                spec:
+                  connectorRef: account.generic
+                  gitFetchType: Commit
+                  folderPath: charts/harness-gitops-agent-controller
+                  repoName: harness-gitops
+                  commitId: <+input>
+              valuesPaths:
+                - hub/controller.yaml
+              skipResourceVersioning: false
+              helmVersion: V3
+      artifacts:
+        primary:
+          primaryArtifactRef: <+input>
+          sources:
+            - identifier: controller_image
+              type: DockerRegistry
+              spec:
+                connectorRef: account.DockerHub
+                imagePath: mkandylis/harness-gitops-agent-operator
+                tag: <+input>
+  gitOpsEnabled: false

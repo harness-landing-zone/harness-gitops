@@ -1,0 +1,99 @@
+# Day-0 values for the ACCOUNT-scoped hub agent. Consumed by service
+# hga_account_agent.
+#
+# Harness resolves expressions in this file before Helm renders the chart, so
+# secrets reach only Kubernetes and never git. Comments are evaluated too, so
+# never write expression syntax in a comment.
+#
+# global must stay at the values root: helm only propagates it into subcharts
+# from there.
+global:
+  image:
+    repository: docker.io/harness/argocd
+    tag: v3.3.10
+
+harnessAgent:
+  metadata:
+    name: <+serviceVariables.agent_name>
+  spec:
+    name: <+serviceVariables.agent_name>
+    scope: <+serviceVariables.agent_scope>
+    tokenSecretRef: <+serviceVariables.token_secret>
+  apiKeySecret:
+    # Created in this release namespace, which is where the controller reads
+    # it. The namespace must be listed in hub/controller.yaml.
+    create: true
+    namespace: ""
+    value: '<+secrets.getValue("hga_api_key")>'
+  # Registers this repo in the bundled Argo CD. The credential is one
+  # single-line JSON secret holding githubAppID, githubAppInstallationID and
+  # githubAppPrivateKeyB64, all as strings.
+  gitSecret:
+    create: true
+    url: <+serviceVariables.repo_url>
+    project: default
+    # ApplicationSet git generators resolve credentials outside any AppProject,
+    # so the credential must also exist as a global template.
+    credsTemplate: true
+    githubAppJson: '<+secrets.getValue("hga_github_app")>'
+
+# Maps AppProject default to the Harness project the pipeline runs in. That
+# pairing is what files everything this hub bootstraps under that project;
+# rootAppSet.project below must name the same AppProject.
+projectMappings:
+  - name: hub-admin
+    appProject: default
+    orgId: <+org.identifier>
+    projectId: <+project.identifier>
+    autoCreateServiceEnv: false
+
+appProject:
+  enabled: true
+  name: default
+  description: Admin AppProject for the hub
+
+# The hub cluster Secret is the only per-hub input. Every ApplicationSet under
+# bootstrap/ selects on fleet_member and reads the rest from here. The
+# environment is whichever Harness Environment the pipeline was run against.
+hubCluster:
+  enabled: true
+  labels:
+    environment: <+env.identifier>
+    harness_env_ref: <+env.identifier>
+  annotations:
+    repo_url: <+serviceVariables.repo_url>
+    harness_account_id: <+account.identifier>
+
+rootAppSet:
+  enabled: true
+  path: bootstrap
+  project: default
+
+gitopsAgent:
+  enabled: true
+  harness:
+    gitopsServerHost: https://app.harness.io/prod1/gitops
+    configMap:
+      logLevel: INFO
+      reconcile:
+        appsetReconcile: true
+    identity:
+      accountIdentifier: <+account.identifier>
+      # orgIdentifier and projectIdentifier are absent on purpose: ACCOUNT
+      # scope requires both omitted, not set to an empty string.
+      agentIdentifier: <+serviceVariables.agent_identifier>
+  agent:
+    harnessName: <+serviceVariables.agent_name>
+    existingSecrets:
+      agentToken: <+serviceVariables.token_secret>
+  argo-cd:
+    crds:
+      install: true
+      keep: true
+    configs:
+      cm:
+        cluster.inClusterEnabled: true
+    redis:
+      image:
+        repository: docker.io/harness/redis
+        tag: 7.4.8

@@ -1,0 +1,26 @@
+# Fed the same org values file as the bootstrap chart. Only these keys and
+# projectMappings[].appProject are read here.
+
+# One AppProject per entry, named by its appProject.
+projectMappings: []
+
+# Where the org's Argo CD may deploy. Required. Drives the Namespaces, the
+# Roles and the cluster Secret allowlist, so they cannot drift apart. Each
+# must start with "<release namespace>-".
+workloadNamespaces: []
+
+# Repos the org's AppProjects may pull from. Empty means deny all.
+sourceRepos: []
+
+# Labels for the workload namespaces, for example Pod Security Admission.
+namespaceLabels: {}
+
+# Name of the restricted cluster Secret, and the destination name in the org's
+# Argo CD.
+clusterName: hub-cluster
+
+# Extra labels on the cluster Secret. Set by bootstrap/orgs.yaml.
+clusterLabels: {}
+
+# Lock the wide-open default AppProject Argo CD creates in every instance.
+lockDefaultProject: true

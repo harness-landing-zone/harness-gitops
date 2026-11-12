@@ -1,0 +1,214 @@
+pipeline:
+  name: HGA Hub Bootstrap
+  identifier: hga_hub_bootstrap
+  orgIdentifier: gitops_reference
+  projectIdentifier: gitops_admin
+  description: Installs the HGA controller and the ACCOUNT-scoped hub agent. Environment and infrastructure are run-time inputs.
+  tags:
+    purpose: platform-cd
+  variables:
+    - name: image_tag
+      type: String
+      description: Controller image tag on Docker Hub.
+      required: true
+      value: <+input>
+    - name: git_ref
+      type: String
+      description: Commit SHA or tag of this repo; both charts and their values are fetched at this one ref.
+      required: true
+      value: <+input>
+    - name: deploy_agent
+      type: String
+      description: Set false to install only the controller.
+      required: true
+      value: <+input>.default(true).allowedValues(true,false)
+    - name: delegate_selector
+      type: String
+      description: Tag of the delegate running inside the target cluster; the verify step is pinned to it.
+      required: true
+      value: <+input>
+  stages:
+    - stage:
+        name: Deploy Controller
+        identifier: deploy_controller
+        description: Install or upgrade the HGA controller in hga-system.
+        type: Deployment
+        spec:
+          deploymentType: NativeHelm
+          service:
+            serviceRef: hga_controller
+            serviceInputs:
+              serviceDefinition:
+                type: NativeHelm
+                spec:
+                  manifests:
+                    - manifest:
+                        identifier: controller_chart
+                        type: HelmChart
+                        spec:
+                          store:
+                            type: Github
+                            spec:
+                              commitId: <+pipeline.variables.git_ref>
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: controller_image
+                      sources:
+                        - identifier: controller_image
+                          type: DockerRegistry
+                          spec:
+                            tag: <+pipeline.variables.image_tag>
+          environment:
+            environmentRef: <+input>
+            deployToAll: false
+            environmentInputs: <+input>
+            serviceOverrideInputs: <+input>
+            infrastructureDefinitions: <+input>
+          execution:
+            steps:
+              - step:
+                  type: HelmDeploy
+                  name: Deploy Controller with Helm
+                  identifier: deploy_controller_with_helm
+                  spec:
+                    skipDryRun: false
+                    skipSteadyStateCheck: false
+                    useUpgradeInstall: true
+                    commandFlags:
+                      - commandType: Install
+                        flag: "--create-namespace --wait --timeout 5m"
+                      - commandType: Upgrade
+                        flag: "--create-namespace --wait --timeout 5m"
+                  timeout: 10m
+            rollbackSteps:
+              - step:
+                  type: HelmRollback
+                  name: Roll Back Controller
+                  identifier: roll_back_controller
+                  spec: {}
+                  timeout: 10m
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+    - stage:
+        name: Deploy Account Agent
+        identifier: deploy_account_agent
+        description: Install or upgrade the ACCOUNT-scoped hub agent, then verify it registered.
+        type: Deployment
+        when:
+          pipelineStatus: Success
+          condition: <+pipeline.variables.deploy_agent> == "true"
+        spec:
+          deploymentType: NativeHelm
+          service:
+            serviceRef: hga_account_agent
+            serviceInputs:
+              serviceDefinition:
+                type: NativeHelm
+                spec:
+                  manifests:
+                    - manifest:
+                        identifier: agent_bootstrap_chart
+                        type: HelmChart
+                        spec:
+                          store:
+                            type: Github
+                            spec:
+                              commitId: <+pipeline.variables.git_ref>
+          environment:
+            environmentRef: <+input>
+            deployToAll: false
+            environmentInputs: <+input>
+            serviceOverrideInputs: <+input>
+            infrastructureDefinitions: <+input>
+          execution:
+            steps:
+              - step:
+                  type: HelmDeploy
+                  name: Deploy Agent with Helm
+                  identifier: deploy_agent_with_helm
+                  spec:
+                    skipDryRun: false
+                    skipSteadyStateCheck: false
+                    useUpgradeInstall: true
+                    commandFlags:
+                      - commandType: Install
+                        flag: "--create-namespace --wait --timeout 10m"
+                      - commandType: Upgrade
+                        flag: "--create-namespace --wait --timeout 10m"
+                  timeout: 15m
+              - step:
+                  type: ShellScript
+                  name: Verify Agent Registration
+                  identifier: verify_agent_registration
+                  description: Waits for the agent to register and every project mapping to become Ready.
+                  spec:
+                    shell: Bash
+                    onDelegate: true
+                    delegateSelectors:
+                      - <+pipeline.variables.delegate_selector>
+                    source:
+                      type: Inline
+                      spec:
+                        script: |-
+                          set -euo pipefail
+
+                          echo "waiting for the controller to register the agent..."
+                          for i in $(seq 1 30); do
+                            AGENT_ID=$(kubectl -n "$NS" get harnessgitopsagent "$NAME" \
+                              -o jsonpath='{.status.agentIdentifier}' 2>/dev/null || true)
+                            [ -n "$AGENT_ID" ] && break
+                            sleep 10
+                          done
+
+                          if [ -z "${AGENT_ID:-}" ]; then
+                            echo "FAILED: status.agentIdentifier never populated."
+                            kubectl -n "$NS" get harnessgitopsagent "$NAME" -o yaml || true
+                            exit 1
+                          fi
+                          echo "registered as: $AGENT_ID"
+                          echo "agent conditions:"
+                          kubectl -n "$NS" get harnessgitopsagent "$NAME" \
+                            -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' || true
+
+                          echo "waiting for every project mapping in $NS to become Ready..."
+                          if ! kubectl -n "$NS" wait harnessgitopsprojectmapping --all \
+                               --for=condition=Ready --timeout=5m; then
+                            echo "FAILED: a HarnessGitopsProjectMapping never became Ready. Conditions:"
+                            kubectl -n "$NS" get harnessgitopsprojectmapping \
+                              -o jsonpath='{range .items[*]}{.metadata.name}: {range .status.conditions[*]}{.type}={.status} ({.reason}) {end}{"\n"}{end}' || true
+                            echo "AgentNotHealthy means the runtime is not CONNECTED in Harness; MappingVerificationFailed means it connected but the mapping did not verify."
+                            exit 1
+                          fi
+                          echo "agent registered and all mappings verified."
+                    environmentVariables:
+                      - name: NS
+                        type: String
+                        value: <+infra.namespace>
+                      - name: NAME
+                        type: String
+                        value: <+serviceVariables.agent_name>
+                    outputVariables:
+                      - name: AGENT_ID
+                        type: String
+                        value: AGENT_ID
+                  timeout: 12m
+            rollbackSteps:
+              - step:
+                  type: HelmRollback
+                  name: Roll Back Agent
+                  identifier: roll_back_agent
+                  spec: {}
+                  timeout: 10m
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+  allowStageExecutions: true

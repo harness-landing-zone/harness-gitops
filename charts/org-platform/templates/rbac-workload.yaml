@@ -1,0 +1,73 @@
+{{- /*
+The Kubernetes wall. The org's Argo CD is installed without ClusterRoles, so
+these Roles are its only rights outside its own namespace. The platform must
+apply them: Kubernetes escalation prevention stops the org granting itself.
+
+Subjects are ServiceAccounts the bootstrap chart creates in the release
+namespace (names fixed by its gitops-helm subchart):
+  - argocd-application-controller applies manifests: full control in the
+    namespace, which is the wall.
+  - gitops-agent: Harness proxies through the agent, not argocd-server, so log
+    requests from Harness need pods/log here.
+No argocd-server Role: the bootstrap chart runs argocd-server at 0 replicas
+and creates no ServiceAccount for it.
+*/}}
+{{- $ns := .Release.Namespace }}
+{{- range .Values.workloadNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $ns }}-argocd-application-controller
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $ns }}-argocd-application-controller
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $ns }}-argocd-application-controller
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: {{ $ns | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $ns }}-gitops-agent
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $ns }}-gitops-agent
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $ns }}-gitops-agent
+subjects:
+  - kind: ServiceAccount
+    name: gitops-agent
+    namespace: {{ $ns | quote }}
+{{- end }}

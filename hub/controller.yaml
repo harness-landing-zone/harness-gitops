@@ -1,0 +1,24 @@
+# Day-0 values for the HGA controller. Consumed by service hga_controller.
+#
+# Harness resolves expressions in this file before Helm renders the chart.
+# Comments are evaluated too, so never write expression syntax in a comment.
+
+image:
+  repository: <+artifacts.primary.imagePath>
+  tag: <+artifacts.primary.tag>
+
+# The chart templates its CRDs so they upgrade with it. keep leaves existing
+# agent CRs in place on a helm uninstall.
+crds:
+  enabled: true
+  keep: true
+
+manager:
+  # The controller acts only in these namespaces and reads each API-key Secret
+  # from the CR's own namespace. Adding an org under environments/ means
+  # adding its namespace here and re-running the pipeline; a CR anywhere
+  # else reports NamespaceNotAllowed and never reaches Harness.
+  managedNamespaces:
+    - hga-hub-agent
+  harnessEndpoint: https://app.harness.io/gateway
+  zapDevelopment: false

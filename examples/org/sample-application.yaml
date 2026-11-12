@@ -1,0 +1,20 @@
+# What a developer creates on the org's agent (Harness UI or API), not a file
+# the platform syncs. The project must be one of the org's appProject names
+# and the namespace one of its workloadNamespaces; the source repo must be in
+# the org's sourceRepos. No CreateNamespace: the platform creates namespaces.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook
+spec:
+  project: REPLACE_APP_PROJECT
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    targetRevision: HEAD
+    path: guestbook
+  destination:
+    name: hub-cluster
+    namespace: REPLACE_WORKLOAD_NAMESPACE
+  syncPolicy:
+    automated:
+      selfHeal: true

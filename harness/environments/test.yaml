@@ -1,0 +1,7 @@
+environment:
+  name: Test
+  identifier: test
+  orgIdentifier: gitops_reference
+  projectIdentifier: gitops_admin
+  description: Test hub. The identifier selects environments/test/ and names the hub agent.
+  type: PreProduction

@@ -1,0 +1,47 @@
+{{- /*
+The AppProject fence. Ordinary resources, not Helm hooks: Argo CD turns a hook
+with before-hook-creation into a sync hook, deleting and recreating the project
+on every sync.
+*/}}
+{{- $cluster := .Values.clusterName | default "hub-cluster" }}
+{{- range .Values.projectMappings }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .appProject | quote }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+spec:
+  description: Workloads in the org's namespaces only.
+  {{- with $.Values.sourceRepos }}
+  sourceRepos:
+    {{- toYaml . | nindent 4 }}
+  {{- else }}
+  sourceRepos: []
+  {{- end }}
+  destinations:
+    {{- range $.Values.workloadNamespaces }}
+    - name: {{ $cluster | quote }}
+      namespace: {{ . | quote }}
+    {{- end }}
+  clusterResourceWhitelist: []
+{{- end }}
+{{- if .Values.lockDefaultProject }}
+---
+{{- /* Argo CD auto-creates a wide-open default project in every instance. Left
+alone it bypasses the fence, so it is locked to deny everything. */}}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "org-platform.labels" . | nindent 4 }}
+spec:
+  description: Deny-all. Use the org's projects instead.
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []
+{{- end }}

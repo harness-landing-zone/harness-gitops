@@ -1,0 +1,18 @@
+{{- include "org-platform.validate" . }}
+{{- /* The org's workload namespaces. Created by the platform, so developers'
+Applications need no CreateNamespace and no cluster-scoped rights. */}}
+{{- range .Values.workloadNamespaces }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ . | quote }}
+  annotations:
+    # Before the Roles that live in them.
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    {{- include "org-platform.labels" $ | nindent 4 }}
+    {{- with $.Values.namespaceLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
