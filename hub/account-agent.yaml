@@ -20,11 +20,11 @@ harnessAgent:
     scope: <+serviceVariables.agent_scope>
     tokenSecretRef: <+serviceVariables.token_secret>
   apiKeySecret:
-    # Created in this release namespace, which is where the controller reads
-    # it. The namespace must be listed in hub/controller.yaml.
+    # The ONE central API-key Secret. The controller reads it from its own
+    # namespace, hga-system, for every agent on the hub, org agents included.
     create: true
-    namespace: ""
-    value: '<+secrets.getValue("hga_api_key")>'
+    namespace: hga-system
+    value: '<+secrets.getValue("HGA-Token")>'
   # Registers this repo in the bundled Argo CD. The credential is one
   # single-line JSON secret holding githubAppID, githubAppInstallationID and
   # githubAppPrivateKeyB64, all as strings.
@@ -47,9 +47,12 @@ projectMappings:
     projectId: <+project.identifier>
     autoCreateServiceEnv: false
 
+# The official appProject template refuses to render until the AppProject CRD
+# exists, and this release installs that CRD, so it stays off. The root
+# ApplicationSet hook creates the AppProject named by rootAppSet.project
+# instead (createProject below); description is read from here.
 appProject:
-  enabled: true
-  name: default
+  enabled: false
   description: Admin AppProject for the hub
 
 # The hub cluster Secret is the only per-hub input. Every ApplicationSet under
@@ -68,6 +71,7 @@ rootAppSet:
   enabled: true
   path: bootstrap
   project: default
+  createProject: true
 
 gitopsAgent:
   enabled: true

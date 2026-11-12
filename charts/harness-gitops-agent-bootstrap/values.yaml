@@ -17,175 +17,119 @@ harnessAgent:
     scope: PROJECT
     type: MANAGED_ARGO_PROVIDER
     existingAgentIdentifier: ""
-    # The Harness API key Secret consumed by the controller (key "api_key").
-    # Either pre-create it in the release namespace, or let the chart create
-    # it via harnessAgent.apiKeySecret below. Never put its plaintext value in
-    # a committed values file.
+    # The Harness API key Secret must already exist in the namespace configured
+    # on the controller. The controller Helm chart defaults that location to
+    # its own release namespace. Its key is "api_key"; never put the value here.
     apiKeySecretRef: harness-api-key-secret
     tokenSecretRef: ""
-  # Optional: the chart creates the Secret named by spec.apiKeySecretRef so a
-  # CD system can inject the key from its secret manager at deploy time.
+  # --- Reference addition (templates/apikey-secret.yaml) ---
+  # Optional: create the Secret named by spec.apiKeySecretRef (key api_key)
+  # so a CD system can inject the key from its secret manager at deploy time.
   apiKeySecret:
     create: false
-    # Namespace to render the Secret into. Empty = this release namespace,
-    # which is the only place the controller reads it from: keys live beside
-    # their Agent CR, and the namespace must be in manager.managedNamespaces.
+    # Namespace to render the Secret into. Set it to the controller's
+    # API-key namespace (controller chart manager.apiKeySecretNamespace,
+    # default: the controller's release namespace). Empty = this release
+    # namespace, which is right only for a controller run without
+    # --api-key-secret-namespace.
     namespace: ""
-    # Supply this only at deploy time from the CD platform's secret manager.
-    # Harness CD resolves its secret expression in an external values file
-    # before Helm renders the Kubernetes Secret.
+    # Supply only at deploy time from the CD platform's secret manager.
     value: ""
     # Keep the Secret on helm uninstall: the controller finalizer still needs
-    # it to authenticate to Harness and deregister the agent while the CR
-    # deletion completes. Deleting the namespace removes it afterwards.
+    # it to deregister the agent while the CR deletion completes.
     keep: true
-  # Optional: register the bootstrap Git repository in the bundled Argo CD.
-  # The chart renders a Secret carrying the argocd.argoproj.io/secret-type
-  # repository label into the release namespace, so a fresh agent can pull
-  # its desired state without any console or API step. githubAppID and
-  # githubAppInstallationID must be QUOTED strings (unquoted 7+ digit YAML
-  # numbers render in scientific notation). Supply the private key either
-  # raw (githubAppPrivateKey, multiline PEM - suits hand-written values
-  # files) or base64-encoded (githubAppPrivateKeyB64 - a single line a CD
-  # secret manager can inject through a values file; it lands in the
-  # Secret's data field unchanged).
+  # --- Reference addition (templates/bootstrap-repo.yaml) ---
+  # Optional: register the bootstrap Git repository in the bundled Argo CD as
+  # a Secret labelled argocd.argoproj.io/secret-type: repository in the
+  # release namespace. githubAppID and githubAppInstallationID must be QUOTED
+  # strings. Supply the private key raw (githubAppPrivateKey, multiline PEM)
+  # or base64-encoded (githubAppPrivateKeyB64, one line), or the whole
+  # credential as one single-line JSON object (githubAppJson).
   gitSecret:
     create: false
-    # Kubernetes Secret name. Argo matches repository Secrets by label, so
-    # this never appears in the CR spec and needs no cross-reference.
     name: bootstrap-repo
     url: ""
     githubAppID: ""
     githubAppInstallationID: ""
     githubAppPrivateKey: ""
     githubAppPrivateKeyB64: ""
-    # Alternative to the four fields above: ONE single-line JSON object with
-    # keys githubAppID, githubAppInstallationID and githubAppPrivateKeyB64
-    # (or githubAppPrivateKey), so a CD platform needs only one secret for
-    # the whole credential. Keep the ids quoted strings inside the JSON too.
     githubAppJson: ""
-    # Optional: Argo repository display name.
+    # Optional Argo repository display name.
     repoName: ""
-    # Optional AppProject name. When set, the repository is scoped to that
-    # AppProject in Argo (only its Applications can use the credential) and
-    # a Harness agent files it under the Harness project mapped to that
-    # AppProject. When empty the repository is global at the agent's own
-    # scope (org/account level for org/account agents).
+    # Optional AppProject the repository is scoped to. Empty = global at the
+    # agent's own scope.
     project: ""
-    # Also render a GLOBAL credential-template Secret (<name>-creds, label
-    # argocd.argoproj.io/secret-type: repo-creds, same GitHub App
-    # credential, never project-scoped). ApplicationSet git generators look
-    # up repo credentials outside any AppProject context, so with only a
-    # project-scoped repository they fetch anonymously and fail on private
-    # repos. The repository entity above keeps the project scoping; this
-    # credential-only Secret unlocks the generators.
+    # Also render a GLOBAL repo-creds Secret (<name>-creds) with the same
+    # credential: ApplicationSet git generators resolve credentials outside
+    # any AppProject, so a project-scoped repository alone is invisible to
+    # them.
     credsTemplate: false
 
 # Each entry becomes one independently reconciled HarnessGitopsProjectMapping
-# referencing the Agent above. orgId is REQUIRED at ACCOUNT scope (the agent
-# has no org of its own); projectId is required at ACCOUNT and ORG scope and
-# inherited at PROJECT scope.
+# that references the Agent above. Add as many mappings as this Agent serves.
 projectMappings: []
 #  - name: default
 #    appProject: default
+#    # Required at ACCOUNT scope; projectId is also required at ORG scope.
+#    # At PROJECT scope both are inherited and should normally be omitted.
 #    orgId: ""
 #    projectId: ""
 #    autoCreateServiceEnv: false
+#    # Optional explicit ownership request for an existing Harness mapping.
+#    # The controller adopts only when this exact ID and full tuple match.
 #    adoptMappingId: ""
 
 appProject:
   enabled: false
   name: default
-  namespace: ""
   description: AppProject created for the Harness GitOps Agent instance
   annotations: {}
   labels: {}
-  # Defaults preserve the chart's original permissive behaviour. Shared-agent
-  # tenants should replace these wildcards with their repository and namespace.
-  sourceRepos:
-    - "*"
-  destinations:
-    - namespace: "*"
-      server: "*"
-  # Empty sourceNamespaces keeps Applications in the agent's own namespace.
-  sourceNamespaces: []
-  clusterResourceWhitelist:
-    - group: "*"
-      kind: "*"
-  clusterResourceBlacklist: []
-  namespaceResourceWhitelist:
-    - group: "*"
-      kind: "*"
-  namespaceResourceBlacklist: []
-  orphanedResources: {}
 
-# Hub self-registration: render the argocd cluster Secret that names THIS
-# cluster as a labeled Argo destination (replaces the anonymous in-cluster
-# entry). The root ApplicationSet below selects hubs by the fleet_member
-# label. A PLAIN resource, not a hook: helm patches it in place, so the
-# destination the whole bootstrap tree hangs off is never deleted/recreated
-# on upgrade.
+# --- Reference addition (templates/hub-cluster-secret.yaml) ---
+# Hub self-registration: an argocd cluster Secret naming THIS cluster as a
+# labelled Argo destination. The root ApplicationSet selects hubs by the
+# fleet_member label. A plain resource, not a hook, so helm patches it in
+# place on upgrade.
 hubCluster:
   enabled: false
-  # Argo cluster name AND Secret name (kept identical: Argo displays the
-  # stringData name, and the root Application targets the destination by
-  # that name).
+  # Argo cluster name AND Secret name.
   name: hub-cluster
   server: https://kubernetes.default.svc
-  # Built-in taxonomy label the root ApplicationSet's clusters generator
-  # selects on.
   fleetMember: hub-cluster
-  # Extra labels/annotations stamped on the Secret (env, zone, ...).
+  # Extra labels/annotations stamped on the Secret.
   labels: {}
   annotations: {}
 
-# Root ApplicationSet for the bundled Argo CD: a clusters generator over
-# hub-labeled cluster Secrets stamps ONE root Application per hub, syncing
-# a flat folder of ApplicationSets (default gitops/bootstrap of the
-# gitSecret repo) to the matched hub BY NAME. The generated Application
-# pins an EXPLICIT directory source, so CMP discovery never go-templates
-# the ApplicationSet placeholders it syncs. Applied with the runtime
-# (phase two) as a post-install/post-upgrade hook AFTER the AppProject -
-# hook manifests are built at fire time, which lets the ApplicationSet CR
-# ship in the same release as the Argo CRDs. before-hook-creation
-# recreates it on every upgrade (absorbing a hand-applied copy of the same
-# name); with preserveResourcesOnDeletion that recreate is a metadata blip
-# (generated Applications are re-stamped, their children keep running).
+# --- Reference addition (templates/root-appset.yaml) ---
+# Root ApplicationSet: one root Application per hub-labelled cluster Secret,
+# syncing a flat folder of ApplicationSets. A post-install/post-upgrade hook,
+# so it can ship in the same release as the Argo CRDs.
 rootAppSet:
   enabled: false
   name: cluster-application-sets
-  # Which cluster Secrets count as hubs. NEVER empty - an empty clusters
-  # selector matches every registered cluster, spokes included (the
-  # template fails the render on an empty selector).
+  # Which cluster Secrets count as hubs. Never empty.
   selector:
     fleet_member: hub-cluster
-  # Repo to sync; empty falls back to harnessAgent.gitSecret.url (the repo
-  # this chart registers in Argo).
+  # Empty falls back to harnessAgent.gitSecret.url.
   repoURL: ""
   path: gitops/bootstrap
   targetRevision: HEAD
-  # Pin the generated Application's destination to a literal cluster name
-  # instead of the {{.name}} placeholder.
-  #
-  # REQUIRED when this chart is installed through an Argo Application that uses
-  # the Harness plugin (plugin.env HELM_ARGS). The CMP runs a SECOND Go template
-  # pass over helm's output, which evaluates the placeholder against an empty
-  # context and stores the literal string "<no value>". Generation then reports
-  # success while every Application is rejected with "there are no clusters with
-  # this name: <no value>".
-  #
-  # Leave empty for a plain helm install (Harness HelmDeploy), where the
-  # placeholder reaches the ApplicationSet controller intact.
+  # Literal destination cluster name instead of the generator placeholder.
+  # Required only when this chart is rendered through the Harness Argo plugin.
   destinationName: ""
-  # Argo AppProject of the root Applications (a Harness agent files them
-  # under the Harness project mapped to that AppProject).
+  # AppProject of the root Application.
   project: default
+  # Also create that AppProject as a hook (weight 0, before the
+  # ApplicationSet). Use this instead of appProject.enabled when the Argo CRDs
+  # are installed by this same release.
+  createProject: false
 
-# Phase switch: with false only the CR is rendered (phase one). Enable the
-# runtime after the controller has written the token Secret so a failure to
-# produce the token is reported precisely instead of as generic unready pods.
+# The controller must already be installed. The Agent CR and runtime can then
+# be installed in one release: pods may briefly wait for the token Secret while
+# the controller registers the Agent and writes it.
 gitopsAgent:
-  enabled: false
+  enabled: true
   argo-cd:
     enabled: true
     # Set install: false on clusters that already have the Argo CRDs (for

@@ -17,7 +17,7 @@ service:
               store:
                 type: Github
                 spec:
-                  connectorRef: account.generic
+                  connectorRef: hga_github
                   gitFetchType: Commit
                   folderPath: charts/harness-gitops-agent-controller
                   repoName: harness-gitops
@@ -33,7 +33,7 @@ service:
             - identifier: controller_image
               type: DockerRegistry
               spec:
-                connectorRef: account.DockerHub
-                imagePath: mkandylis/harness-gitops-agent-operator
+                connectorRef: hga_dockerhub
+                imagePath: harness/gitops-agent-bootstrap-controller
                 tag: <+input>
   gitOpsEnabled: false

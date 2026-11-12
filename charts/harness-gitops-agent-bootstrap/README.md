@@ -1,5 +1,25 @@
 # harness-gitops-agent-bootstrap
 
+> **Reference build `0.4.0-ref.1`.** This is the official chart 0.4.0
+> (harness-gitops-agent-operator, branch `sync/harness-main`, commit
+> `57a643a`) plus four additive templates, each off by default so the chart
+> behaves exactly like the official one unless enabled:
+>
+> | Template | Values | Does |
+> |---|---|---|
+> | `templates/apikey-secret.yaml` | `harnessAgent.apiKeySecret` | the API-key Secret, in the controller's API-key namespace |
+> | `templates/bootstrap-repo.yaml` | `harnessAgent.gitSecret` | repository (and repo-creds) Secret for the bundled Argo CD |
+> | `templates/hub-cluster-secret.yaml` | `hubCluster` | labelled `hub-cluster` cluster Secret |
+> | `templates/root-appset.yaml` | `rootAppSet` | root ApplicationSet (and optionally its AppProject) as hooks |
+>
+> Their values blocks are marked "Reference addition" in `values.yaml`, and
+> `values.schema.json` gained matching entries.
+>
+> **To update:** copy the new official chart over this folder, re-add the
+> four templates, their `values.yaml` blocks and schema entries, set
+> `version` to `<official>-ref.1`, then `helm dependency build .` so the
+> `gitops-helm` tarball stays vendored in `charts/`.
+
 Installs one Harness GitOps Agent runtime and its Kubernetes control-plane
 resources:
 
@@ -23,11 +43,11 @@ Only the controller and the target Secret handle it.
 
 - The controller from `charts/harness-gitops-agent-controller` is running. Its
   chart installs both required CRDs.
-- A Secret containing the Harness API key exists in this release namespace, and
-  this namespace is listed in the controller's `manager.managedNamespaces`. The
-  controller reads keys only beside the Agent CR. The Secret name is
-  `harnessAgent.spec.apiKeySecretRef` and its data key is `api_key`, and
-  `harnessAgent.apiKeySecret.create` can render it when Harness CD deploys.
+- A Secret containing the Harness API key exists in the controller's configured
+  API-key namespace. The controller Helm chart defaults this to its own release
+  namespace; a directly run controller without
+  `--api-key-secret-namespace` instead reads from each Agent namespace. Its name
+  is `harnessAgent.spec.apiKeySecretRef` and its data key is `api_key`.
 - Use a least-privilege Harness service-account key. Never place the key in
   chart values.
 - Run one Agent runtime per namespace because the upstream runtime uses fixed

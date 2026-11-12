@@ -27,6 +27,13 @@ spec:
       namespace: {{ . | quote }}
     {{- end }}
   clusterResourceWhitelist: []
+  {{- /* The controller reconciles agent and mapping CRs in ANY namespace,
+  authenticating with the central account-level API key. An agent or mapping
+  deployed into a workload namespace would act with that key, so the org's
+  Argo CD may not deploy anything in the gitops.harness.io group. */}}
+  namespaceResourceBlacklist:
+    - group: gitops.harness.io
+      kind: "*"
 {{- end }}
 {{- if .Values.lockDefaultProject }}
 ---

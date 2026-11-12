@@ -1,17 +1,20 @@
-{{- /* Root ApplicationSet: a clusters generator over hub-labeled cluster
-Secrets (the hubCluster Secret above) stamps ONE root Application per hub,
-syncing a flat folder of ApplicationSets to that hub BY NAME. The generated
-Application pins an EXPLICIT directory source, so CMP discovery never
-go-templates the ApplicationSet placeholders it syncs. Applied as a
-post-install/post-upgrade hook (weight 1, AFTER the AppProject at 0) and
-gated on the runtime phase switch: hook manifests are built at fire time,
-which is what lets this CR ship in the SAME release as the Argo CRDs.
-before-hook-creation recreates it on every upgrade - and absorbs a
-hand-applied copy of the same name regardless of helm ownership; with
-preserveResourcesOnDeletion the recreate is a metadata blip (generated
-Applications are re-stamped, their children keep running). Argo runtime
-placeholders are backtick-escaped so they reach the appset controller
-literally. */}}
+{{- /* Reference addition (not in the official chart).
+Root ApplicationSet: a clusters generator over hub-labeled cluster Secrets (the
+hubCluster Secret) stamps ONE root Application per hub, syncing a flat folder
+of ApplicationSets to that hub BY NAME. The generated Application pins an
+EXPLICIT directory source, so CMP discovery never go-templates the
+ApplicationSet placeholders it syncs.
+
+Applied as post-install/post-upgrade hooks: hook manifests are built at fire
+time, which is what lets these CRs ship in the SAME release as the Argo CRDs.
+The official appproject.yaml cannot do that (it fails the render until the
+AppProject CRD exists), so with rootAppSet.createProject the AppProject named
+by rootAppSet.project is rendered here too, at weight 0, before the
+ApplicationSet at weight 1. before-hook-creation recreates both on every
+upgrade (absorbing a copy Argo CD or a human created); with
+preserveResourcesOnDeletion that is a metadata blip (generated Applications
+are re-stamped, their children keep running). Argo runtime placeholders are
+backtick-escaped so they reach the appset controller literally. */}}
 {{- $as := (.Values).rootAppSet }}
 {{- if and $as $as.enabled .Values.gitopsAgent.enabled }}
 {{- $repoURL := default ((.Values.harnessAgent).gitSecret).url $as.repoURL }}
@@ -20,6 +23,37 @@ literally. */}}
 {{- end }}
 {{- if not $as.selector }}
 {{- fail "rootAppSet.selector must not be empty - an empty clusters selector matches EVERY registered cluster, spokes included" }}
+{{- end }}
+{{- if $as.createProject }}
+{{- if .Values.appProject.enabled }}
+{{- fail "set rootAppSet.createProject or appProject.enabled, not both" }}
+{{- end }}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ default "default" $as.project | quote }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+  labels:
+    {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
+spec:
+  {{- /* Same permissive spec as the official appproject.yaml. */}}
+  description: {{ .Values.appProject.description | quote }}
+  sourceRepos:
+    - "*"
+  destinations:
+    - namespace: "*"
+      server: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
 {{- end }}
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -55,33 +89,11 @@ spec:
           exclude: exclude/*
       destination:
         namespace: {{ .Release.Namespace | quote }}
-        {{- /* THE PLACEHOLDER DOES NOT SURVIVE THE HARNESS CMP.
-
-        The backtick form below is escaped to survive exactly ONE Go template
-        pass - helm's - so helm emits the literal '{{.name}}' for the
-        ApplicationSet controller to resolve at ITS stage. That is correct when
-        this chart is installed by helm directly (Harness HelmDeploy, the
-        homelab hub's day-0 path), and the homelab's live appset does hold the
-        literal.
-
-        It is WRONG when the chart is installed through an Argo Application
-        using the Harness plugin (plugin.env HELM_ARGS), because the CMP runs a
-        SECOND Go template pass over helm's output. That pass evaluates
-        '{{.name}}' against an empty context and bakes the string '<no value>'
-        into the stored ApplicationSet. Generation then succeeds - "generated 1
-        applications" - and every generated Application is REJECTED at
-        validation with:
-
-          application destination spec is invalid:
-          there are no clusters with this name: <no value>
-
-        so the appset reports ParametersGenerated=True and produces nothing.
-
-        destinationName pins the destination to a literal, skipping the
-        placeholder entirely. Set it on any cluster reached through the plugin.
-        Safe because this template already emits a STATICALLY named Application
-        (see metadata.name), so it has always assumed exactly one matched hub -
-        a per-cluster destination bought nothing it does not already require. */}}
+        {{- /* The backtick form survives exactly ONE Go template pass (helm's),
+        so the ApplicationSet controller receives the literal placeholder.
+        Installed through an Argo Application with the Harness plugin, the CMP
+        runs a second pass and stores "<no value>"; set destinationName to a
+        literal cluster name in that case. */}}
         {{- if $as.destinationName }}
         name: {{ $as.destinationName | quote }}
         {{- else }}

@@ -159,7 +159,7 @@ pipeline:
 
                           echo "waiting for the controller to register the agent..."
                           for i in $(seq 1 30); do
-                            AGENT_ID=$(kubectl -n "$NS" get harnessgitopsagent "$NAME" \
+                            AGENT_ID=$(kubectl -n "$NS" get harnessgitopsagents.gitops.harness.io "$NAME" \
                               -o jsonpath='{.status.agentIdentifier}' 2>/dev/null || true)
                             [ -n "$AGENT_ID" ] && break
                             sleep 10
@@ -167,21 +167,21 @@ pipeline:
 
                           if [ -z "${AGENT_ID:-}" ]; then
                             echo "FAILED: status.agentIdentifier never populated."
-                            kubectl -n "$NS" get harnessgitopsagent "$NAME" -o yaml || true
+                            kubectl -n "$NS" get harnessgitopsagents.gitops.harness.io "$NAME" -o yaml || true
                             exit 1
                           fi
                           echo "registered as: $AGENT_ID"
                           echo "agent conditions:"
-                          kubectl -n "$NS" get harnessgitopsagent "$NAME" \
+                          kubectl -n "$NS" get harnessgitopsagents.gitops.harness.io "$NAME" \
                             -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' || true
 
                           echo "waiting for every project mapping in $NS to become Ready..."
-                          if ! kubectl -n "$NS" wait harnessgitopsprojectmapping --all \
+                          if ! kubectl -n "$NS" wait harnessgitopsprojectmappings.gitops.harness.io --all \
                                --for=condition=Ready --timeout=5m; then
                             echo "FAILED: a HarnessGitopsProjectMapping never became Ready. Conditions:"
-                            kubectl -n "$NS" get harnessgitopsprojectmapping \
+                            kubectl -n "$NS" get harnessgitopsprojectmappings.gitops.harness.io \
                               -o jsonpath='{range .items[*]}{.metadata.name}: {range .status.conditions[*]}{.type}={.status} ({.reason}) {end}{"\n"}{end}' || true
-                            echo "AgentNotHealthy means the runtime is not CONNECTED in Harness; MappingVerificationFailed means it connected but the mapping did not verify."
+                            echo "AgentNotHealthy means the runtime is not CONNECTED in Harness; AppProjectNotFound means the AppProject is missing; VerificationFailed means it connected but the mapping did not verify."
                             exit 1
                           fi
                           echo "agent registered and all mappings verified."

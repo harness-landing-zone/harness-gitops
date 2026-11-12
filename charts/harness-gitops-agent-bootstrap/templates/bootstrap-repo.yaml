@@ -1,5 +1,5 @@
-{{- /* Bootstrap repository registration. The bundled Argo CD watches its
-own (release) namespace for Secrets labeled argocd.argoproj.io/secret-type,
+{{- /* Reference addition (not in the official chart).
+Bootstrap repository registration. The bundled Argo CD watches its own (release) namespace for Secrets labeled argocd.argoproj.io/secret-type,
 so registering the bootstrap repository at install time lets a fresh agent
 pull its desired state without any console or API step. Repository Secrets
 are matched by that label - the Secret name itself is free-form, which is

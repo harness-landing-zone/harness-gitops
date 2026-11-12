@@ -15,8 +15,9 @@
 # No metadata.namespace on purpose: the root Application applies this into the
 # hub agent's own namespace, which is where its ApplicationSet controller looks.
 #
-# Before an org's agent can register, its namespace must be listed in
-# hub/controller.yaml and hold the Secret harness-api-key-secret (key api_key).
+# Nothing is needed outside this repo before an org's agent registers: the
+# controller acts on agent CRs in any namespace and authenticates with the one
+# central API-key Secret in hga-system.
 #
 # A selector or path that matches nothing still reports success. Check with
 # `kubectl get applications`, not with this ApplicationSet's status.
@@ -67,6 +68,18 @@ spec:
               - '/{{.path.path}}/values.yaml'
             # Enforced by the platform over the org file.
             valuesObject:
+              harnessAgent:
+                spec:
+                  # The central key is account-level, so an org file must not
+                  # widen its agent's scope or attach to another agent.
+                  scope: ORG
+                  existingAgentIdentifier: ""
+                  # The central Secret in hga-system, never a per-org one.
+                  apiKeySecretRef: harness-api-key-secret
+                # Only the controller holds the API key. The org's agent
+                # connects with its own token; never create a key Secret here.
+                apiKeySecret:
+                  create: false
               gitopsAgent:
                 harness:
                   identity:
@@ -83,9 +96,10 @@ spec:
                       # Only the restricted cluster Secret from org-platform
                       # may be a destination.
                       cluster.inClusterEnabled: "false"
-              # Both are Helm hooks in this chart, which Argo CD deletes and
-              # recreates on every sync. org-platform renders the org's
-              # projects as ordinary resources instead.
+              # The bootstrap chart's AppProject needs the CRD at render time
+              # and its root ApplicationSet is a Helm hook, which Argo CD
+              # deletes and recreates on every sync. org-platform renders the
+              # org's projects as ordinary resources instead.
               appProject:
                 enabled: false
               rootAppSet:

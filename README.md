@@ -1,7 +1,8 @@
 # Harness GitOps Agents reference architecture
 
 A reference architecture for running Harness GitOps Agents at scale with the
-HGA controller. The headline: **onboarding an org is one pull request.**
+official HGA controller (`harness/gitops-agent-bootstrap-controller`). The
+headline: **onboarding an org is one pull request.**
 
 The platform team adds one values file per Harness org. The hub turns it into
 an org shard: a namespace holding a dedicated, namespaced Argo CD with an
@@ -85,13 +86,18 @@ Only files under `hub/` may use Harness expressions. Files under
 - A Kubernetes cluster with a Harness delegate running in it.
 - Kubernetes connector `hga_test_hub`, set to inherit credentials from the
   delegate.
-- Secrets `hga_api_key` (an account-scope key that can create agents) and
+- Secrets `HGA-Token`, the hub's one API key (account scope, can create
+  agents; the controller reads it from `hga-system` for every agent), and
   `hga_github_app`, a single-line JSON with string ids and a base64 private key:
   `{"githubAppID":"...","githubAppInstallationID":"...","githubAppPrivateKeyB64":"..."}`
 - The GitHub App installed on this repo.
-- Connectors `account.generic` (GitHub) and `account.DockerHub`.
+- Connectors `hga_github` (GitHub App, on the org that holds this repo) and
+  `hga_dockerhub` (Docker Hub, anonymous).
 - The entities under `harness/` created in the project (org
   `gitops_reference`, project `gitops_admin`).
+
+`workshop/1-harness-setup/` creates all of the above except the
+cluster and its delegate, with one `terraform apply`.
 
 ## Bootstrap a hub
 
@@ -99,7 +105,7 @@ Run `hga_hub_bootstrap` with:
 
 - environment `test`, and both infrastructures (`hga_system`, `account_agent`);
 - `git_ref`: the commit to deploy, from `git rev-parse HEAD`. It must be pushed;
-- `image_tag`: the controller image tag on Docker Hub;
+- `image_tag`: a `harness/gitops-agent-bootstrap-controller` tag (`v0.1.0`);
 - `delegate_selector`: the tag of the delegate inside the cluster.
 
 Verify:
@@ -113,12 +119,9 @@ Verify:
    replace every `REPLACE_` placeholder. `<name>` must be a DNS label. List the
    org's `workloadNamespaces` (each must start with `<name>-`) and the
    `sourceRepos` it may deploy from.
-2. Add `<name>` to `manager.managedNamespaces` in `hub/controller.yaml`, then
-   re-run the pipeline.
-3. Create Secret `harness-api-key-secret` with key `api_key` in namespace
-   `<name>`. An org-scoped key is enough.
-4. Commit and push. Verify with `kubectl -n hga-hub-agent get applications`
-   (a new `org-<name>` appears) and `kubectl -n <name> get appprojects`.
+2. Commit and push. No controller redeploy and no per-org API key: the
+   controller serves every namespace with the central key. Verify with
+   `kubectl -n hga-hub-agent get applications` (a new `org-<name>` appears) and `kubectl -n <name> get appprojects`.
 
 Developers then create Applications on the org's agent, like
 `examples/org/sample-application.yaml`. A private source repo needs an Argo CD
@@ -139,11 +142,20 @@ repository credential Secret in namespace `<name>`.
 3. **AppProjects.** One per project mapping, allowing `sourceRepos` into the
    listed namespaces and no cluster-scoped objects. `default` is locked to
    deny everything, since Argo CD creates a wide-open one in every instance.
+   Every project also blacklists the `gitops.harness.io` group (see below).
+
+The controller acts on agent and mapping objects in any namespace with the
+central account-level key. So the org's AppProjects refuse `gitops.harness.io`
+objects, and `bootstrap/orgs.yaml` enforces ORG scope, no
+`existingAgentIdentifier` and the central Secret name over every org file.
 
 What remains:
 
 - All of an org's projects share the org's namespaces. Per-project
   confinement is not built.
+- Anyone who can create `gitops.harness.io` objects in any namespace can use
+  the central key. The org's Roles allow every resource in its namespaces, so
+  the blacklist is an Argo CD fence, not RBAC. Review `orgIdentifier` in PRs.
 - An org may only list namespaces that start with its own name, so it cannot
   claim `kube-system` or another org's namespaces. The one gap: do not give an
   org a name that is another org's name plus a dash-suffix (`bu` and
@@ -155,10 +167,13 @@ What remains:
 
 - Harness expressions in comments under `hub/` are evaluated. Never write
   expression syntax in a comment there.
-- A namespace missing from `manager.managedNamespaces` makes the agent report
-  `NamespaceNotAllowed`.
-- Argo CD does not create `harness-api-key-secret`; each org needs it before
-  its agent can register.
+- Only the controller uses the API key, from the one Secret
+  `harness-api-key-secret` in `hga-system`. Agents never see it: each connects
+  to Harness with its own token, which the controller writes into the agent's
+  namespace. Rotating `HGA-Token` means re-running the pipeline.
+- The official `appProject` template needs the AppProject CRD before it
+  renders, so the hub creates `default` through `rootAppSet.createProject`
+  (a hook) instead.
 - Never rename an org folder. The folder name is the Helm release name, which
   is baked into immutable Deployment selectors.
 - `tokenSecretRef` must equal `gitopsAgent.agent.existingSecrets.agentToken`, or
@@ -170,7 +185,7 @@ What remains:
 - A second controller on one cluster collides on cluster-scoped CRDs.
 - An ApplicationSet that matches nothing still reports success. Check
   `kubectl get applications`, not ApplicationSet status.
-- Update the vendored charts by re-copying, not by editing.
+- Update the vendored charts by re-copying (bootstrap: see its README).
 
 ## Not included yet
 

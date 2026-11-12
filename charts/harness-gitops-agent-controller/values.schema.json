@@ -87,21 +87,9 @@
     "manager": {
       "type": "object",
       "properties": {
-        "apiKeySecretNamespace": false,
-        "managedNamespaces": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "maxLength": 63,
-            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-          },
-          "description": "Explicit approved instance namespaces. Empty denies all. API keys are always read from the Agent CR namespace."
-        },
-        "harnessEndpoint": {
+        "apiKeySecretNamespace": {
           "type": "string",
-          "pattern": "^https?://[^ ?#@]+$",
-          "description": "Harness API gateway base URL. Pinned by configuration so the pod environment cannot redirect requests."
+          "description": "Namespace containing API key Secrets. Empty resolves to the controller Helm release namespace."
         },
         "appProjectPendingRetryInterval": {
           "type": "string",
@@ -158,7 +146,7 @@
           "type": "array"
         }
       },
-      "required": ["managedNamespaces", "harnessEndpoint", "appProjectPendingRetryInterval", "harnessMappingResyncInterval", "healthProbe", "metrics", "enableHTTP2", "zapDevelopment", "extraArgs", "env", "envFrom"]
+      "required": ["apiKeySecretNamespace", "appProjectPendingRetryInterval", "harnessMappingResyncInterval", "healthProbe", "metrics", "enableHTTP2", "zapDevelopment", "extraArgs", "env", "envFrom"]
     },
     "enableServiceLinks": {
       "type": "boolean"

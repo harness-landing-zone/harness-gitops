@@ -6,19 +6,16 @@
 # bootstrap/orgs.yaml feeds this one file to two charts: the bootstrap chart
 # (namespaced Argo CD, ORG agent, project mappings) and charts/org-platform
 # (workload namespaces, Roles, restricted cluster entry, AppProjects). It
-# injects the account id and enforces appProject, rootAppSet, hubCluster,
+# injects the account id and enforces the agent scope (ORG), the API-key
+# Secret (the central one in hga-system), appProject, rootAppSet, hubCluster,
 # createClusterRoles, crds and cluster.inClusterEnabled, so do not set those.
 #
 # Plain Helm values only: Argo renders this file, and Argo cannot resolve
 # Harness expressions.
 #
-# Before the org's agent can register:
-#   1. add <name> to manager.managedNamespaces in hub/controller.yaml and
-#      re-run the hga_hub_bootstrap pipeline;
-#   2. create Secret harness-api-key-secret (key api_key) in namespace <name>;
-#      an org-scoped key is enough.
-# Developers' private repos need an Argo CD repository credential Secret in
-# namespace <name>.
+# Committing the file is all it takes: no controller redeploy and no per-org
+# API key. Developers' private repos need an Argo CD repository credential
+# Secret in namespace <name>.
 global:
   image:
     repository: docker.io/harness/argocd
@@ -29,7 +26,6 @@ harnessAgent:
     name: REPLACE_NAME-agent
   spec:
     name: REPLACE_NAME-agent
-    scope: ORG
     tokenSecretRef: REPLACE_NAME-agent-token
 
 # One HarnessGitopsProjectMapping and one AppProject per entry. appProject

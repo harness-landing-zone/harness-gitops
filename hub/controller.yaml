@@ -14,11 +14,8 @@ crds:
   keep: true
 
 manager:
-  # The controller acts only in these namespaces and reads each API-key Secret
-  # from the CR's own namespace. Adding an org under environments/ means
-  # adding its namespace here and re-running the pipeline; a CR anywhere
-  # else reports NamespaceNotAllowed and never reaches Harness.
-  managedNamespaces:
-    - hga-hub-agent
-  harnessEndpoint: https://app.harness.io/gateway
+  # apiKeySecretNamespace is left unset on purpose: it defaults to this
+  # release namespace, hga-system. The controller reads the ONE central
+  # API-key Secret from there for every agent CR in every namespace. The hub
+  # agent release (hub/account-agent.yaml) creates that Secret.
   zapDevelopment: false

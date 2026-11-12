@@ -1,27 +1,18 @@
-{{- /* A mapping-only release targets an existing Argo installation, so its
-AppProject is an ordinary Helm-managed object. A new runtime with CRD install
-enabled still needs a post-install hook because gitops-helm renders the Argo
-CRDs as templates and Kubernetes cannot build an AppProject before they exist. */}}
-{{- $existingAgentMode := ne (trim (default "" .Values.harnessAgent.spec.existingAgentIdentifier)) "" -}}
-{{- $renderAppProject := and .Values.appProject.enabled (or $existingAgentMode .Values.gitopsAgent.enabled) -}}
-{{- $argoCD := index .Values.gitopsAgent "argo-cd" -}}
-{{- $useHook := and (not $existingAgentMode) .Values.gitopsAgent.enabled $argoCD.crds.install -}}
-{{- if $renderAppProject }}
+{{- /* Keep the AppProject as a normal release resource. Helm then patches it
+in place on upgrade and removes it on uninstall instead of replacing an
+untracked hook object. */}}
+{{- if and .Values.appProject.enabled .Values.gitopsAgent.enabled }}
+{{- if not (.Capabilities.APIVersions.Has "argoproj.io/v1alpha1/AppProject") }}
+{{- fail "appProject.enabled requires the AppProject CRD to exist before this Helm render; install the runtime with appProject.enabled=false first, or use an existing Argo CD installation" }}
+{{- end }}
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: {{ default "default" .Values.appProject.name | quote }}
-  namespace: {{ default .Release.Namespace .Values.appProject.namespace | quote }}
-  {{- if or $useHook .Values.appProject.annotations }}
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.appProject.annotations }}
   annotations:
-    {{- if $useHook }}
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "0"
-    helm.sh/hook-delete-policy: before-hook-creation
-    {{- end }}
-    {{- with .Values.appProject.annotations }}
     {{- toYaml . | nindent 4 }}
-    {{- end }}
   {{- end }}
   labels:
     {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
@@ -30,44 +21,15 @@ metadata:
     {{- end }}
 spec:
   description: {{ .Values.appProject.description | quote }}
-  {{- if .Values.appProject.sourceRepos }}
   sourceRepos:
-    {{- toYaml .Values.appProject.sourceRepos | nindent 4 }}
-  {{- else }}
-  sourceRepos: []
-  {{- end }}
-  {{- if .Values.appProject.destinations }}
+    - "*"
   destinations:
-    {{- toYaml .Values.appProject.destinations | nindent 4 }}
-  {{- else }}
-  destinations: []
-  {{- end }}
-  {{- with .Values.appProject.sourceNamespaces }}
-  sourceNamespaces:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- if .Values.appProject.clusterResourceWhitelist }}
+    - namespace: "*"
+      server: "*"
   clusterResourceWhitelist:
-    {{- toYaml .Values.appProject.clusterResourceWhitelist | nindent 4 }}
-  {{- else }}
-  clusterResourceWhitelist: []
-  {{- end }}
-  {{- with .Values.appProject.clusterResourceBlacklist }}
-  clusterResourceBlacklist:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- if .Values.appProject.namespaceResourceWhitelist }}
+    - group: "*"
+      kind: "*"
   namespaceResourceWhitelist:
-    {{- toYaml .Values.appProject.namespaceResourceWhitelist | nindent 4 }}
-  {{- else }}
-  namespaceResourceWhitelist: []
-  {{- end }}
-  {{- with .Values.appProject.namespaceResourceBlacklist }}
-  namespaceResourceBlacklist:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.appProject.orphanedResources }}
-  orphanedResources:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    - group: "*"
+      kind: "*"
 {{- end }}

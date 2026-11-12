@@ -21,54 +21,6 @@
         },
         "labels": {
           "type": "object"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "sourceRepos": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "destinations": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "sourceNamespaces": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "clusterResourceWhitelist": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "clusterResourceBlacklist": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "namespaceResourceWhitelist": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "namespaceResourceBlacklist": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "orphanedResources": {
-          "type": "object"
         }
       }
     },
@@ -103,6 +55,141 @@
           "name",
           "appProject"
         ]
+      }
+    },
+    "harnessAgent": {
+      "type": "object",
+      "properties": {
+        "apiKeySecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "create": {
+              "type": "boolean"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "keep": {
+              "type": "boolean"
+            }
+          }
+        },
+        "gitSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "githubAppID": {
+              "type": "string"
+            },
+            "githubAppInstallationID": {
+              "type": "string"
+            },
+            "githubAppPrivateKey": {
+              "type": "string"
+            },
+            "githubAppPrivateKeyB64": {
+              "type": "string"
+            },
+            "githubAppJson": {
+              "type": "string"
+            },
+            "repoName": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "create": {
+              "type": "boolean"
+            },
+            "credsTemplate": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "hubCluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fleetMember": {
+          "type": "string",
+          "minLength": 1
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rootAppSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "repoURL": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRevision": {
+          "type": "string"
+        },
+        "destinationName": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "createProject": {
+          "type": "boolean"
+        }
       }
     }
   },

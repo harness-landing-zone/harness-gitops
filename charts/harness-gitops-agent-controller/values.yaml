@@ -5,8 +5,8 @@ replicaCount: 1
 revisionHistoryLimit: 5
 
 image:
-  repository: mkandylis/harness-gitops-agent-operator
-  tag: ""
+  repository: harness/gitops-agent-bootstrap-controller
+  tag: v0.1.0
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -31,12 +31,9 @@ leaderElection:
   enabled: true
 
 manager:
-  # Explicit instance namespaces only; empty denies all management requests.
-  # API-key Secrets must exist beside their Agent CRs. No global fallback.
-  managedNamespaces: []
-  # Harness API gateway the controller calls. Pinned here so the pod
-  # environment (HARNESS_ENDPOINT) can never redirect provisioning keys.
-  harnessEndpoint: https://app.harness.io/gateway
+  # Empty uses the controller Helm release namespace. Set an explicit namespace
+  # only when API key Secrets are managed somewhere else.
+  apiKeySecretNamespace: ""
   appProjectPendingRetryInterval: 20s
   harnessMappingResyncInterval: 5m
   healthProbe:
