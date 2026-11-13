@@ -20,6 +20,14 @@ namespaceLabels: {}
 # Argo CD.
 clusterName: hub-cluster
 
+# false: workloadNamespaces are on the hub, and this chart creates them, the
+# Roles and the restricted in-cluster Secret (the hub-namespace mode).
+# true: workloadNamespaces are on the remote cluster named clusterName. This
+# chart then creates only the AppProjects (and the locked default); the
+# cluster's Secret, with a token limited to those namespaces, is written out of
+# band by the platform (local/register-spoke.sh on k3d), never from git.
+remoteCluster: false
+
 # Extra labels on the cluster Secret. Set by bootstrap/orgs.yaml.
 clusterLabels: {}
 

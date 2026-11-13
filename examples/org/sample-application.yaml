@@ -13,7 +13,9 @@ spec:
     targetRevision: HEAD
     path: guestbook
   destination:
-    name: hub-cluster
+    # The org's clusterName: hub-cluster on the hub, the remote cluster's name
+    # (k3d-hga-spoke locally) with remoteCluster: true.
+    name: REPLACE_CLUSTER_NAME
     namespace: REPLACE_WORKLOAD_NAMESPACE
   syncPolicy:
     automated:

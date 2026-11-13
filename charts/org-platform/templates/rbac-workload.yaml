@@ -12,6 +12,7 @@ namespace (names fixed by its gitops-helm subchart):
 No argocd-server Role: charts/gitops-agent runs argocd-server at 0 replicas
 and creates no ServiceAccount for it.
 */}}
+{{- if not .Values.remoteCluster }}
 {{- $ns := .Release.Namespace }}
 {{- range .Values.workloadNamespaces }}
 ---
@@ -70,4 +71,5 @@ subjects:
   - kind: ServiceAccount
     name: gitops-agent
     namespace: {{ $ns | quote }}
+{{- end }}
 {{- end }}

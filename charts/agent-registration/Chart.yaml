@@ -1,0 +1,9 @@
+apiVersion: v2
+name: agent-registration
+description: >-
+  Registers a GitOps agent whose runtime runs elsewhere. On the hub (default):
+  the HarnessGitopsAgent, its project mappings and empty shadow AppProjects,
+  for the controller to reconcile. With spoke=true: the team namespaces and the real
+  AppProjects, for the runtime's own Argo CD on the spoke.
+type: application
+version: 0.1.0

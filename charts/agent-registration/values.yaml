@@ -1,0 +1,47 @@
+# Reads the same keys as charts/gitops-agent (under gitopsAgent), so one spoke
+# values file feeds the hub registration (this chart), the spoke runtime
+# (charts/gitops-agent with gitopsAgent.harnessAgent.enabled false and
+# gitopsAgent.projectMappings []) and the spoke's AppProjects (this chart with
+# spoke: true).
+
+# false (hub): agent object, project mappings and shadow AppProjects. The
+# controller registers the agent, writes its token Secret
+# (harnessAgent.spec.tokenSecretRef) here, and checks only that each mapped
+# AppProject exists in this namespace; the shadows are deny-all.
+# true (spoke): only the real AppProjects and the locked default.
+spoke: false
+
+gitopsAgent:
+  harnessAgent:
+    metadata:
+      # Required: the HarnessGitopsAgent name, referenced by every mapping.
+      name: ""
+    spec:
+      name: ""
+      scope: ORG
+      operator: ARGO
+      type: MANAGED_ARGO_PROVIDER
+      # Required: a key Secret in the controller's key namespace (hga-system),
+      # for a BU agent its org-scoped key, for example harness-api-key-bu1.
+      apiKeySecretRef: ""
+      # Required: the token Secret the controller writes beside this object;
+      # the runtime's gitopsAgent.agent.existingSecrets.agentToken must name the
+      # same Secret on the spoke.
+      tokenSecretRef: ""
+      existingAgentIdentifier: ""
+  harness:
+    identity:
+      accountIdentifier: ""
+      orgIdentifier: ""
+      projectIdentifier: ""
+      agentIdentifier: ""
+  # One mapping and one AppProject per entry: {name, appProject, projectId,
+  # orgId (optional, the agent's org), autoCreateServiceEnv}. appProject must
+  # not be default.
+  projectMappings: []
+
+# Spoke only (spoke: true): what every team project may use. Each
+# destinationNamespaces entry is also created as a Namespace (kept on delete);
+# kube-*, default and the release namespace are refused.
+sourceRepos: []
+destinationNamespaces: []

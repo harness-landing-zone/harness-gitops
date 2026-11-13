@@ -13,6 +13,7 @@ locals {
     svc_controller    = "services/hga_controller.yaml"
     svc_account_agent = "services/hga_account_agent.yaml"
     pipeline          = "pipelines/hga_hub_bootstrap.yaml"
+    input_set         = "input_sets/hga_hub_bootstrap_${var.environment_id}.yaml"
     } : name => replace(
     replace(file("${local.harness_dir}/${rel}"), "orgIdentifier: gitops_reference", "orgIdentifier: ${var.org_id}"),
     "projectIdentifier: gitops_admin", "projectIdentifier: ${var.project_id}"
@@ -25,7 +26,9 @@ resource "harness_platform_environment" "this" {
   type       = yamldecode(local.yaml.environment).environment.type
   org_id     = local.project_scope.org_id
   project_id = local.project_scope.project_id
-  yaml       = local.yaml.environment
+  # The verify step must run on the hub's own delegate, the one the connector
+  # selects; without a step selector Harness may pick any delegate in the account.
+  yaml = replace(local.yaml.environment, "value: local-hub-delegate", "value: ${var.hub_delegate_name}")
 }
 
 resource "harness_platform_infrastructure" "hga_system" {
@@ -113,4 +116,16 @@ resource "harness_platform_pipeline" "hub_bootstrap" {
     harness_platform_infrastructure.hga_system,
     harness_platform_infrastructure.account_agent,
   ]
+}
+
+# Every run-time input filled in, so a run is one click.
+resource "harness_platform_input_set" "hub_bootstrap" {
+  identifier  = yamldecode(local.yaml.input_set).inputSet.identifier
+  name        = yamldecode(local.yaml.input_set).inputSet.name
+  description = yamldecode(local.yaml.input_set).inputSet.description
+  tags        = [for k, v in yamldecode(local.yaml.input_set).inputSet.tags : "${k}:${v}"]
+  org_id      = local.project_scope.org_id
+  project_id  = local.project_scope.project_id
+  pipeline_id = harness_platform_pipeline.hub_bootstrap.id
+  yaml        = local.yaml.input_set
 }

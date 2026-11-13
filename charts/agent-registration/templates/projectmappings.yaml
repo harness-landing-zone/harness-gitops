@@ -1,0 +1,26 @@
+{{- if not .Values.spoke }}
+{{- range .Values.gitopsAgent.projectMappings }}
+{{- if eq .appProject "default" }}
+{{- fail "gitopsAgent.projectMappings appProject \"default\" is reserved: it is locked on the spoke" }}
+{{- end }}
+---
+apiVersion: gitops.harness.io/v1alpha1
+kind: HarnessGitopsProjectMapping
+metadata:
+  name: {{ required "gitopsAgent.projectMappings[].name is required" .name | quote }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+  agentRef:
+    name: {{ $.Values.gitopsAgent.harnessAgent.metadata.name | quote }}
+  appProject: {{ required "gitopsAgent.projectMappings[].appProject is required" .appProject | quote }}
+  {{- with .orgId }}
+  orgId: {{ . | quote }}
+  {{- end }}
+  projectId: {{ required "gitopsAgent.projectMappings[].projectId is required" .projectId | quote }}
+  autoCreateServiceEnv: {{ default false .autoCreateServiceEnv }}
+{{- end }}
+{{- end }}

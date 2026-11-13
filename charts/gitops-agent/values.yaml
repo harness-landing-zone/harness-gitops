@@ -44,6 +44,11 @@ gitopsAgent:
       resources:
         requests: {cpu: 500m, memory: 512Mi}
         limits: {cpu: 1, memory: 1Gi}
+      # Harness plugin sidecar off (gitops-helm has no switch; its only extra
+      # container is argocd-harness-plugin, 1 CPU and 1Gi reserved). Its
+      # ConfigMap and volume still render, unused. Set the list back to
+      # enable it.
+      extraContainers: []
     redis:
       resources:
         requests: {cpu: 100m, memory: 128Mi}
@@ -59,6 +64,9 @@ apiKeySecret:
   namespace: ""
   # Supply only at deploy time from the CD platform's secret manager.
   value: ""
+  # More key Secrets in the same namespace, name: value, for example a
+  # business unit's org-scoped key. Same supply rule as value.
+  extra: {}
   # Keep the Secret on helm uninstall: the controller finalizer still needs it
   # to deregister the agent while the agent object is deleted.
   keep: true

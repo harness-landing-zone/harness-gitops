@@ -12,21 +12,11 @@ pipeline:
       description: Tag of harness/gitops-agent-bootstrap-controller on Docker Hub, for example v0.1.0. Read by hub/controller.yaml.
       required: true
       value: <+input>
-    - name: git_ref
-      type: String
-      description: Commit SHA or tag of this repo; both charts and their values are fetched at this one ref.
-      required: true
-      value: <+input>
     - name: deploy_agent
       type: String
       description: Set false to install only the controller.
       required: true
       value: <+input>.default(true).allowedValues(true,false)
-    - name: delegate_selector
-      type: String
-      description: Tag of the delegate running inside the target cluster; the verify step is pinned to it.
-      required: true
-      value: <+input>
   stages:
     - stage:
         name: Deploy Controller
@@ -37,19 +27,6 @@ pipeline:
           deploymentType: NativeHelm
           service:
             serviceRef: hga_controller
-            serviceInputs:
-              serviceDefinition:
-                type: NativeHelm
-                spec:
-                  manifests:
-                    - manifest:
-                        identifier: controller_chart
-                        type: HelmChart
-                        spec:
-                          store:
-                            type: Github
-                            spec:
-                              commitId: <+pipeline.variables.git_ref>
           environment:
             environmentRef: <+input>
             deployToAll: false
@@ -98,19 +75,6 @@ pipeline:
           deploymentType: NativeHelm
           service:
             serviceRef: hga_account_agent
-            serviceInputs:
-              serviceDefinition:
-                type: NativeHelm
-                spec:
-                  manifests:
-                    - manifest:
-                        identifier: agent_bootstrap_chart
-                        type: HelmChart
-                        spec:
-                          store:
-                            type: Github
-                            spec:
-                              commitId: <+pipeline.variables.git_ref>
           environment:
             environmentRef: <+input>
             deployToAll: false
@@ -142,7 +106,7 @@ pipeline:
                     shell: Bash
                     onDelegate: true
                     delegateSelectors:
-                      - <+pipeline.variables.delegate_selector>
+                      - <+env.variables.delegate_selector>
                     source:
                       type: Inline
                       spec:

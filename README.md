@@ -111,12 +111,15 @@ cluster and its delegate, with one `terraform apply`.
 
 ## Bootstrap a hub
 
-Run `hga_hub_bootstrap` with:
+Run `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`, which fills
+in:
 
 - environment `test`, and both infrastructures (`hga_system`, `account_agent`);
-- `git_ref`: the commit to deploy, from `git rev-parse HEAD`. It must be pushed;
 - `image_tag`: a `harness/gitops-agent-bootstrap-controller` tag (`v0.1.0`);
-- `delegate_selector`: the tag of the delegate inside the cluster.
+- `deploy_agent`: `true`.
+
+The charts and `hub/*.yaml` are fetched from branch `main`, so push first. The
+verify step runs on the delegate the Kubernetes connector selects.
 
 Verify:
 

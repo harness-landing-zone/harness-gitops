@@ -1,0 +1,89 @@
+{{- /*
+Hub (spoke false): deny-all shadows. The mapping reconciler only checks that
+an AppProject of that name exists in the agent object's namespace on the
+controller's cluster; nothing runs from it (the hub's Argo CD reads only its
+own namespace).
+Spoke (spoke true): the real fence for the runtime's Argo CD, plus a locked
+default. Ordinary resources, not hooks; SkipDryRunOnMissingResource because
+the Argo CRDs may arrive in the same sync.
+*/}}
+{{- if .Values.spoke }}
+{{- /* On a cluster-wide Argo CD the AppProjects are the teams' only fence, so
+they may never name the cluster's own namespaces or this Argo CD's. */}}
+{{- range .Values.destinationNamespaces }}
+{{- if or (hasPrefix "kube-" .) (eq . "default") (eq . $.Release.Namespace) }}
+{{- fail (printf "destinationNamespaces must not contain %q: kube-*, default and the Argo CD namespace %q are off limits to teams" . $.Release.Namespace) }}
+{{- end }}
+---
+{{- /* The team namespaces, created by the platform so Applications need no
+CreateNamespace. Never pruned or deleted with the release: they hold the
+teams' workloads. */}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ . | quote }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-wave: "-1"
+    helm.sh/resource-policy: keep
+{{- end }}
+{{- end }}
+{{- range .Values.gitopsAgent.projectMappings }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .appProject | quote }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  {{- if not $.Values.spoke }}
+  description: Shadow of the spoke's AppProject, for the mapping only. Deny-all.
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []
+  {{- else }}
+  description: Team workloads on this cluster.
+  sourceRepos:
+    {{- toYaml (default list $.Values.sourceRepos) | nindent 4 }}
+  destinations:
+    {{- range $.Values.destinationNamespaces }}
+    - server: https://kubernetes.default.svc
+      namespace: {{ . | quote }}
+    {{- end }}
+  clusterResourceWhitelist: []
+  {{- /* The controller acts on agent objects in any namespace it can see; none
+  belong on a spoke. */}}
+  namespaceResourceBlacklist:
+    - group: gitops.harness.io
+      kind: "*"
+  {{- end }}
+{{- end }}
+{{- if .Values.spoke }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  description: Deny-all. Use the team projects instead.
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []
+{{- end }}

@@ -18,10 +18,10 @@ service:
                 type: Github
                 spec:
                   connectorRef: hga_github
-                  gitFetchType: Commit
+                  gitFetchType: Branch
                   folderPath: charts/gitops-agent
                   repoName: harness-gitops
-                  commitId: <+input>
+                  branch: main
               valuesPaths:
                 - hub/account-agent.yaml
               skipResourceVersioning: false

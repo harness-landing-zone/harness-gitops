@@ -3,7 +3,7 @@ service:
   identifier: hga_controller
   orgIdentifier: gitops_reference
   projectIdentifier: gitops_admin
-  description: Installs the HGA controller with Native Helm. Chart and values are fetched at one commit; the image tag is a pipeline input read by the values file.
+  description: Installs the HGA controller with Native Helm. Chart and values are fetched from branch main; the image tag is a pipeline input read by the values file.
   tags:
     purpose: platform-cd
   serviceDefinition:
@@ -18,10 +18,10 @@ service:
                 type: Github
                 spec:
                   connectorRef: hga_github
-                  gitFetchType: Commit
+                  gitFetchType: Branch
                   folderPath: charts/harness-gitops-agent-controller
                   repoName: harness-gitops
-                  commitId: <+input>
+                  branch: main
               valuesPaths:
                 - hub/controller.yaml
               skipResourceVersioning: false

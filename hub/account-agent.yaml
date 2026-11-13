@@ -16,6 +16,10 @@ apiKeySecret:
   create: true
   namespace: hga-system
   value: '<+secrets.getValue("HGA-Token")>'
+  # One org-scoped key per business unit. Agent objects for that BU's spokes
+  # name it in spec.apiKeySecretRef.
+  extra:
+    harness-api-key-bu1: '<+secrets.getValue("hga_controller_bu1_token")>'
 
 # Registers this repo in the bundled Argo CD. The credential is one
 # single-line JSON secret holding githubAppID, githubAppInstallationID and

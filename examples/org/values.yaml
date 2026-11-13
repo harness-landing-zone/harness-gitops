@@ -23,6 +23,14 @@ workloadNamespaces:
   - REPLACE_NAME-dev
   - REPLACE_NAME-prod
 
+# Push to a remote cluster instead of the hub: set both, and list that
+# cluster's namespaces above (no "<name>-" prefix needed). The platform
+# registers the cluster out of band (local/register-spoke.sh on k3d), with a
+# token limited to those namespaces; nothing is then created on the hub but the
+# AppProjects, and namespaceLabels is ignored.
+# remoteCluster: true
+# clusterName: k3d-hga-spoke
+
 # Repos the org's projects may deploy from. Empty means deny all.
 sourceRepos:
   - REPLACE_SOURCE_REPO_URL

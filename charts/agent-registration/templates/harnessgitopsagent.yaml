@@ -1,0 +1,32 @@
+{{- if not .Values.spoke }}
+{{- $a := .Values.gitopsAgent.harnessAgent }}
+{{- $id := .Values.gitopsAgent.harness.identity }}
+{{- $scope := upper (default "ORG" $a.spec.scope) }}
+apiVersion: gitops.harness.io/v1alpha1
+kind: HarnessGitopsAgent
+metadata:
+  name: {{ required "gitopsAgent.harnessAgent.metadata.name is required" $a.metadata.name | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  name: {{ default $id.agentIdentifier $a.spec.name | quote }}
+  identifier: {{ required "gitopsAgent.harness.identity.agentIdentifier is required" $id.agentIdentifier | quote }}
+  accountId: {{ required "gitopsAgent.harness.identity.accountIdentifier is required" $id.accountIdentifier | quote }}
+  {{- if ne $scope "ACCOUNT" }}
+  orgId: {{ required "gitopsAgent.harness.identity.orgIdentifier is required for ORG and PROJECT scope" $id.orgIdentifier | quote }}
+  {{- end }}
+  {{- if eq $scope "PROJECT" }}
+  projectId: {{ required "gitopsAgent.harness.identity.projectIdentifier is required for PROJECT scope" $id.projectIdentifier | quote }}
+  {{- end }}
+  operator: {{ $a.spec.operator | quote }}
+  scope: {{ $scope | quote }}
+  type: {{ $a.spec.type | quote }}
+  apiKeySecretRef: {{ required "gitopsAgent.harnessAgent.spec.apiKeySecretRef is required" $a.spec.apiKeySecretRef | quote }}
+  tokenSecretRef: {{ required "gitopsAgent.harnessAgent.spec.tokenSecretRef is required" $a.spec.tokenSecretRef | quote }}
+  {{- with $a.spec.existingAgentIdentifier }}
+  existingAgentIdentifier: {{ . | quote }}
+  {{- end }}
+{{- end }}
