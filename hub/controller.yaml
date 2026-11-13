@@ -3,9 +3,11 @@
 # Harness resolves expressions in this file before Helm renders the chart.
 # Comments are evaluated too, so never write expression syntax in a comment.
 
+# The official image is public. The tag is a pipeline input, so a controller
+# upgrade is a pipeline run rather than a chart change.
 image:
-  repository: <+artifacts.primary.imagePath>
-  tag: <+artifacts.primary.tag>
+  repository: harness/gitops-agent-bootstrap-controller
+  tag: <+pipeline.variables.image_tag>
 
 # The chart templates its CRDs so they upgrade with it. keep leaves existing
 # agent CRs in place on a helm uninstall.

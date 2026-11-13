@@ -91,8 +91,8 @@ Only files under `hub/` may use Harness expressions. Files under
   `hga_github_app`, a single-line JSON with string ids and a base64 private key:
   `{"githubAppID":"...","githubAppInstallationID":"...","githubAppPrivateKeyB64":"..."}`
 - The GitHub App installed on this repo.
-- Connectors `hga_github` (GitHub App, on the org that holds this repo) and
-  `hga_dockerhub` (Docker Hub, anonymous).
+- Connector `hga_github` (GitHub App, on the org that holds this repo). No
+  registry connector is needed: the controller image is public.
 - The entities under `harness/` created in the project (org
   `gitops_reference`, project `gitops_admin`).
 

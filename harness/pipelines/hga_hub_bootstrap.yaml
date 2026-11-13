@@ -9,7 +9,7 @@ pipeline:
   variables:
     - name: image_tag
       type: String
-      description: Controller image tag on Docker Hub.
+      description: Tag of harness/gitops-agent-bootstrap-controller on Docker Hub, for example v0.1.0. Read by hub/controller.yaml.
       required: true
       value: <+input>
     - name: git_ref
@@ -50,14 +50,6 @@ pipeline:
                             type: Github
                             spec:
                               commitId: <+pipeline.variables.git_ref>
-                  artifacts:
-                    primary:
-                      primaryArtifactRef: controller_image
-                      sources:
-                        - identifier: controller_image
-                          type: DockerRegistry
-                          spec:
-                            tag: <+pipeline.variables.image_tag>
           environment:
             environmentRef: <+input>
             deployToAll: false

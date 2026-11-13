@@ -1,5 +1,5 @@
 output "delegate_token" {
-  description = "Delegate token for the hub delegate. Read with: terraform output -raw delegate_token"
+  description = "Delegate token for the hub delegate. Read with: tofu output -raw delegate_token"
   value       = harness_platform_delegatetoken.hub.value
   sensitive   = true
 }
@@ -13,7 +13,7 @@ output "delegate_install_command" {
       harness-delegate/harness-delegate-ng \
       --set delegateName=${var.hub_delegate_name} \
       --set accountId=${var.account_id} \
-      --set delegateToken="$(terraform output -raw delegate_token)" \
+      --set delegateToken="$(tofu output -raw delegate_token)" \
       --set managerEndpoint=https://app.harness.io \
       --set upgrader.enabled=true
   EOT
@@ -21,8 +21,4 @@ output "delegate_install_command" {
 
 output "github_connector_ref" {
   value = harness_platform_connector_github.this.id
-}
-
-output "dockerhub_connector_ref" {
-  value = harness_platform_connector_docker.dockerhub.id
 }

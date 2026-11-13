@@ -26,16 +26,6 @@ resource "harness_platform_connector_github" "this" {
   }
 }
 
-# Anonymous: the controller image is public. Anonymous pulls are rate-limited.
-resource "harness_platform_connector_docker" "dockerhub" {
-  identifier = "hga_dockerhub"
-  name       = "hga_dockerhub"
-  org_id     = local.project_scope.org_id
-  project_id = local.project_scope.project_id
-  type       = "DockerHub"
-  url        = "https://index.docker.io/v2/"
-}
-
 resource "harness_platform_connector_kubernetes" "hub" {
   identifier = "hga_test_hub"
   name       = "hga_test_hub"

@@ -1,6 +1,6 @@
 # 1. Harness setup
 
-One `terraform apply` creates everything Harness needs before the hub can be
+One `tofu apply` creates everything Harness needs before the hub can be
 bootstrapped. Nothing here touches a cluster.
 
 ## What it creates
@@ -14,7 +14,6 @@ bootstrapped. Nothing here touches a cluster.
 | Project | Secret text: GitHub App JSON for the controller | `hga_github_app` |
 | Project | Secret file: GitHub App key for the connector | `hga_github_app_key` |
 | Project | GitHub connector (GitHub App, API access on) | `hga_github` |
-| Project | Docker Hub connector (anonymous) | `hga_dockerhub` |
 | Project | Delegate token | `hga_test_hub` |
 | Project | Kubernetes connector (inherits from delegate `hga-test-hub`) | `hga_test_hub` |
 | Project | Environment, 2 infrastructures, 2 services, pipeline, read from `../../../harness/` | `test`, `hga_system`, `account_agent`, `hga_controller`, `hga_account_agent`, `hga_hub_bootstrap` |
@@ -45,16 +44,16 @@ repo's `harness/` YAML at plan time, so edit the YAML, not this folder.
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars   # fill in the placeholders
-terraform init
-terraform plan
-terraform apply
+tofu init
+tofu plan
+tofu apply
 ```
 
 ## Next
 
-1. Install the delegate in the hub cluster: `terraform output -raw delegate_install_command`
+1. Install the delegate in the hub cluster: `tofu output -raw delegate_install_command`
    prints the `helm upgrade -i` command; it reads the token with
-   `terraform output -raw delegate_token`, so run it from this folder.
+   `tofu output -raw delegate_token`, so run it from this folder.
 2. When the delegate is connected, run the `hga_hub_bootstrap` pipeline.
 
 ## State holds secrets
@@ -70,5 +69,5 @@ Terraform fails on entities that already exist. Import them, or delete them in
 Harness first. A project-scoped entity imports as `<org_id>/<project_id>/<id>`:
 
 ```bash
-terraform import harness_platform_connector_kubernetes.hub gitops_reference/gitops_admin/hga_test_hub
+tofu import harness_platform_connector_kubernetes.hub gitops_reference/gitops_admin/hga_test_hub
 ```
