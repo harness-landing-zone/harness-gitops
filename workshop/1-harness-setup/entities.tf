@@ -4,7 +4,7 @@
 # gitops_admin; replace() rewrites those two lines so changing var.org_id or
 # var.project_id still works.
 locals {
-  harness_dir = "${path.module}/../../harness"
+  harness_dir = "${path.module}/harness"
 
   yaml = { for name, rel in {
     environment       = "environments/${var.environment_id}.yaml"

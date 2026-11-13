@@ -3,13 +3,13 @@ The Kubernetes wall. The org's Argo CD is installed without ClusterRoles, so
 these Roles are its only rights outside its own namespace. The platform must
 apply them: Kubernetes escalation prevention stops the org granting itself.
 
-Subjects are ServiceAccounts the bootstrap chart creates in the release
+Subjects are ServiceAccounts charts/gitops-agent creates in the release
 namespace (names fixed by its gitops-helm subchart):
   - argocd-application-controller applies manifests: full control in the
     namespace, which is the wall.
   - gitops-agent: Harness proxies through the agent, not argocd-server, so log
     requests from Harness need pods/log here.
-No argocd-server Role: the bootstrap chart runs argocd-server at 0 replicas
+No argocd-server Role: charts/gitops-agent runs argocd-server at 0 replicas
 and creates no ServiceAccount for it.
 */}}
 {{- $ns := .Release.Namespace }}

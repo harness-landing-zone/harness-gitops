@@ -8,21 +8,21 @@ spec (the controller never reads it). The credential arrives either as the
 individual githubApp* fields or as ONE single-line JSON blob
 (githubAppJson), so a CD secret manager needs only one secret for the whole
 credential. */}}
-{{- $git := (.Values.harnessAgent).gitSecret }}
+{{- $git := .Values.gitSecret }}
 {{- if and $git $git.create }}
 {{- $name := default "bootstrap-repo" $git.name }}
-{{- $url := required "harnessAgent.gitSecret.url is required" $git.url }}
+{{- $url := required "gitSecret.url is required" $git.url }}
 {{- $appID := $git.githubAppID }}
 {{- $installationID := $git.githubAppInstallationID }}
 {{- $privateKey := $git.githubAppPrivateKey }}
 {{- $privateKeyB64 := $git.githubAppPrivateKeyB64 }}
 {{- with $git.githubAppJson }}
 {{- if or $appID $installationID $privateKey $privateKeyB64 }}
-{{- fail "harnessAgent.gitSecret: set githubAppJson or the individual githubApp* fields, not both" }}
+{{- fail "gitSecret: set githubAppJson or the individual githubApp* fields, not both" }}
 {{- end }}
 {{- $app := fromJson . }}
 {{- if hasKey $app "Error" }}
-{{- fail (printf "harnessAgent.gitSecret.githubAppJson is not valid JSON: %s" (get $app "Error")) }}
+{{- fail (printf "gitSecret.githubAppJson is not valid JSON: %s" (get $app "Error")) }}
 {{- end }}
 {{- $appID = get $app "githubAppID" }}
 {{- $installationID = get $app "githubAppInstallationID" }}
@@ -30,22 +30,22 @@ credential. */}}
 {{- $privateKeyB64 = get $app "githubAppPrivateKeyB64" }}
 {{- end }}
 {{- if not $appID }}
-{{- fail "harnessAgent.gitSecret: githubAppID is required (individual field or githubAppJson key)" }}
+{{- fail "gitSecret: githubAppID is required (individual field or githubAppJson key)" }}
 {{- end }}
 {{- if not $installationID }}
-{{- fail "harnessAgent.gitSecret: githubAppInstallationID is required (individual field or githubAppJson key)" }}
+{{- fail "gitSecret: githubAppInstallationID is required (individual field or githubAppJson key)" }}
 {{- end }}
 {{- if not (kindIs "string" $appID) }}
-{{- fail "harnessAgent.gitSecret: githubAppID must be a string - quote it (unquoted YAML/JSON numbers of 7+ digits render in scientific notation)" }}
+{{- fail "gitSecret: githubAppID must be a string - quote it (unquoted YAML/JSON numbers of 7+ digits render in scientific notation)" }}
 {{- end }}
 {{- if not (kindIs "string" $installationID) }}
-{{- fail "harnessAgent.gitSecret: githubAppInstallationID must be a string - quote it (unquoted YAML/JSON numbers of 7+ digits render in scientific notation)" }}
+{{- fail "gitSecret: githubAppInstallationID must be a string - quote it (unquoted YAML/JSON numbers of 7+ digits render in scientific notation)" }}
 {{- end }}
 {{- if and $privateKey $privateKeyB64 }}
-{{- fail "harnessAgent.gitSecret: set githubAppPrivateKey or githubAppPrivateKeyB64, not both" }}
+{{- fail "gitSecret: set githubAppPrivateKey or githubAppPrivateKeyB64, not both" }}
 {{- end }}
 {{- if not (or $privateKey $privateKeyB64) }}
-{{- fail "harnessAgent.gitSecret needs githubAppPrivateKey (multiline PEM) or githubAppPrivateKeyB64 (base64-encoded PEM)" }}
+{{- fail "gitSecret needs githubAppPrivateKey (multiline PEM) or githubAppPrivateKeyB64 (base64-encoded PEM)" }}
 {{- end }}
 apiVersion: v1
 kind: Secret
@@ -54,7 +54,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     argocd.argoproj.io/secret-type: repository
-    {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
+    {{- include "gitops-agent.labels" . | nindent 4 }}
 type: Opaque
 {{- if $privateKeyB64 }}
 data:
@@ -91,7 +91,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     argocd.argoproj.io/secret-type: repo-creds
-    {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
+    {{- include "gitops-agent.labels" . | nindent 4 }}
 type: Opaque
 {{- if $privateKeyB64 }}
 data:

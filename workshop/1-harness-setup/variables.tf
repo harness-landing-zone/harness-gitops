@@ -16,7 +16,7 @@ variable "project_id" {
 }
 
 variable "environment_id" {
-  description = "Environment identifier; must match harness/environments/<id>.yaml."
+  description = "Environment identifier; must match ./harness/environments/<id>.yaml."
   type        = string
   default     = "test"
 }

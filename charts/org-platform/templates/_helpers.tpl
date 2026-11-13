@@ -21,12 +21,12 @@ namespace and the platform would grant full control there. */}}
 {{- end }}
 {{- end }}
 {{- $seen := dict }}
-{{- range .Values.projectMappings }}
+{{- range (.Values.gitopsAgent).projectMappings }}
 {{- if eq .appProject "default" }}
-{{- fail "projectMappings appProject \"default\" is reserved: org-platform locks it" }}
+{{- fail "gitopsAgent.projectMappings appProject \"default\" is reserved: org-platform locks it" }}
 {{- end }}
 {{- if hasKey $seen .appProject }}
-{{- fail (printf "projectMappings contains duplicate appProject %q" .appProject) }}
+{{- fail (printf "gitopsAgent.projectMappings contains duplicate appProject %q" .appProject) }}
 {{- end }}
 {{- $_ := set $seen .appProject true }}
 {{- end }}

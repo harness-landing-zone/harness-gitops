@@ -4,7 +4,7 @@ with before-hook-creation into a sync hook, deleting and recreating the project
 on every sync.
 */}}
 {{- $cluster := .Values.clusterName | default "hub-cluster" }}
-{{- range .Values.projectMappings }}
+{{- range (.Values.gitopsAgent).projectMappings }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject

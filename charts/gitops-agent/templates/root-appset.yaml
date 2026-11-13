@@ -17,16 +17,16 @@ are re-stamped, their children keep running). Argo runtime placeholders are
 backtick-escaped so they reach the appset controller literally. */}}
 {{- $as := (.Values).rootAppSet }}
 {{- if and $as $as.enabled .Values.gitopsAgent.enabled }}
-{{- $repoURL := default ((.Values.harnessAgent).gitSecret).url $as.repoURL }}
+{{- $repoURL := default (.Values.gitSecret).url $as.repoURL }}
 {{- if not $repoURL }}
-{{- fail "rootAppSet.repoURL is required when harnessAgent.gitSecret.url is not set" }}
+{{- fail "rootAppSet.repoURL is required when gitSecret.url is not set" }}
 {{- end }}
 {{- if not $as.selector }}
 {{- fail "rootAppSet.selector must not be empty - an empty clusters selector matches EVERY registered cluster, spokes included" }}
 {{- end }}
 {{- if $as.createProject }}
-{{- if .Values.appProject.enabled }}
-{{- fail "set rootAppSet.createProject or appProject.enabled, not both" }}
+{{- if .Values.gitopsAgent.appProject.enabled }}
+{{- fail "set rootAppSet.createProject or gitopsAgent.appProject.enabled, not both" }}
 {{- end }}
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -38,10 +38,10 @@ metadata:
     helm.sh/hook-weight: "0"
     helm.sh/hook-delete-policy: before-hook-creation
   labels:
-    {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
+    {{- include "gitops-agent.labels" . | nindent 4 }}
 spec:
   {{- /* Same permissive spec as the official appproject.yaml. */}}
-  description: {{ .Values.appProject.description | quote }}
+  description: {{ .Values.gitopsAgent.appProject.description | quote }}
   sourceRepos:
     - "*"
   destinations:
@@ -65,7 +65,7 @@ metadata:
     helm.sh/hook-weight: "1"
     helm.sh/hook-delete-policy: before-hook-creation
   labels:
-    {{- include "harness-gitops-agent-bootstrap.labels" . | nindent 4 }}
+    {{- include "gitops-agent.labels" . | nindent 4 }}
 spec:
   goTemplate: true
   syncPolicy:

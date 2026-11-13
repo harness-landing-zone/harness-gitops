@@ -16,10 +16,10 @@ bootstrapped. Nothing here touches a cluster.
 | Project | GitHub connector (GitHub App, API access on) | `hga_github` |
 | Project | Delegate token | `hga_test_hub` |
 | Project | Kubernetes connector (inherits from delegate `hga-test-hub`) | `hga_test_hub` |
-| Project | Environment, 2 infrastructures, 2 services, pipeline, read from `../../../harness/` | `test`, `hga_system`, `account_agent`, `hga_controller`, `hga_account_agent`, `hga_hub_bootstrap` |
+| Project | Environment, 2 infrastructures, 2 services, pipeline, read from `harness/` in this folder | `test`, `hga_system`, `account_agent`, `hga_controller`, `hga_account_agent`, `hga_hub_bootstrap` |
 
 The environment, infrastructures, services and pipeline are read from the
-repo's `harness/` YAML at plan time, so edit the YAML, not this folder.
+`harness/` YAML in this folder at plan time, so edit the YAML, not `entities.tf`.
 
 ## What you need first
 

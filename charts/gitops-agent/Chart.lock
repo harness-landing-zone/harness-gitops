@@ -1,0 +1,6 @@
+dependencies:
+- name: gitops-helm
+  repository: https://harness.github.io/gitops-helm/
+  version: 1.2.12
+digest: sha256:be609a49a8f24dca0e3e56f99ab22caa0ede25f23059bc6b8b52bdc6aa5ac711
+generated: "2026-11-13T00:00:00Z"

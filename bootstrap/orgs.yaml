@@ -2,7 +2,7 @@
 #
 # Each file becomes, in namespace <name> on the hub cluster, a NAMESPACED Argo
 # CD with an ORG-scoped Harness GitOps Agent and one project mapping per
-# Harness project (bootstrap chart). charts/org-platform adds the org's
+# Harness project (charts/gitops-agent). charts/org-platform adds the org's
 # workload namespaces, the Roles that let that Argo CD deploy only there, a
 # restricted cluster entry and the AppProject fence. Both charts read the same
 # file; the platform-enforced values below win over it.
@@ -60,7 +60,7 @@ spec:
         # Argo CD, the ORG agent and its project mappings.
         - repoURL: '{{.metadata.annotations.repo_url}}'
           targetRevision: HEAD
-          path: charts/harness-gitops-agent-bootstrap
+          path: charts/gitops-agent
           helm:
             releaseName: '{{.path.basename}}'
             # A leading slash is relative to the repo root.
@@ -68,19 +68,20 @@ spec:
               - '/{{.path.path}}/values.yaml'
             # Enforced by the platform over the org file.
             valuesObject:
-              harnessAgent:
-                spec:
-                  # The central key is account-level, so an org file must not
-                  # widen its agent's scope or attach to another agent.
-                  scope: ORG
-                  existingAgentIdentifier: ""
-                  # The central Secret in hga-system, never a per-org one.
-                  apiKeySecretRef: harness-api-key-secret
-                # Only the controller holds the API key. The org's agent
-                # connects with its own token; never create a key Secret here.
-                apiKeySecret:
-                  create: false
               gitopsAgent:
+                harnessAgent:
+                  spec:
+                    # The central key is account-level, so an org file must not
+                    # widen its agent's scope or attach to another agent.
+                    scope: ORG
+                    existingAgentIdentifier: ""
+                    # The central Secret in hga-system, never a per-org one.
+                    apiKeySecretRef: harness-api-key-secret
+                # The official AppProject needs the CRD at render time.
+                # org-platform renders the org's projects as ordinary resources
+                # instead.
+                appProject:
+                  enabled: false
                 harness:
                   identity:
                     accountIdentifier: '{{.metadata.annotations.harness_account_id}}'
@@ -96,15 +97,17 @@ spec:
                       # Only the restricted cluster Secret from org-platform
                       # may be a destination.
                       cluster.inClusterEnabled: "false"
-              # The bootstrap chart's AppProject needs the CRD at render time
-              # and its root ApplicationSet is a Helm hook, which Argo CD
-              # deletes and recreates on every sync. org-platform renders the
-              # org's projects as ordinary resources instead.
-              appProject:
-                enabled: false
+              # None of the four hub extras. Only the controller holds the API
+              # key: the org's agent connects with its own token, so never
+              # create a key Secret here. The root ApplicationSet is a Helm
+              # hook, which Argo CD deletes and recreates on every sync.
+              # org-platform owns the one cluster Secret for this server URL.
+              apiKeySecret:
+                create: false
+              gitSecret:
+                create: false
               rootAppSet:
                 enabled: false
-              # org-platform owns the one cluster Secret for this server URL.
               hubCluster:
                 enabled: false
         # Workload namespaces, Roles, restricted cluster entry, AppProjects.

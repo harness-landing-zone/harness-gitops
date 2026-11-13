@@ -1,0 +1,123 @@
+# This chart's own keys, plus the few gitops-helm defaults it changes. Every
+# other gitops-helm value goes under gitopsAgent (see its values.yaml), including
+# its bootstrap keys gitopsAgent.harnessAgent, gitopsAgent.projectMappings and
+# gitopsAgent.appProject. global stays at the values root.
+
+gitopsAgent:
+  # Condition of the gitops-helm dependency.
+  enabled: true
+  # The few defaults this chart changes in gitops-helm. They carry over what
+  # the retired bootstrap wrapper chart set, so hub and org
+  # installs behave as before.
+  # Render the HarnessGitopsAgent (gitops-helm defaults to false).
+  harnessAgent:
+    enabled: true
+  # The upgrader CronJob reads the chart-managed token Secret, which does not
+  # exist when the controller writes the token (agent.existingSecrets).
+  upgrader:
+    enabled: false
+  harness:
+    configMap:
+      http:
+        agentHttpTarget: https://app.harness.io/gitops
+      logLevel: info
+  # Smaller than gitops-helm's 1 CPU per component, so a hub and its org
+  # shards fit on a small cluster.
+  agent:
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {cpu: 500m, memory: 512Mi}
+  argo-cd:
+    configs:
+      params:
+        server.repo.server.timeout.seconds: "300"
+        controller.repo.server.timeout.seconds: "300"
+    controller:
+      resources:
+        requests: {cpu: 500m, memory: 1Gi}
+        limits: {cpu: 1, memory: 2Gi}
+    applicationSet:
+      resources:
+        requests: {cpu: 250m, memory: 256Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+    repoServer:
+      resources:
+        requests: {cpu: 500m, memory: 512Mi}
+        limits: {cpu: 1, memory: 1Gi}
+    redis:
+      resources:
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+
+# Creates the Harness API-key Secret the controller reads. Its name is
+# gitopsAgent.harnessAgent.spec.apiKeySecretRef and its data key is api_key.
+apiKeySecret:
+  create: false
+  # The controller's API-key namespace (controller chart
+  # manager.apiKeySecretNamespace, default: the controller's release
+  # namespace). Empty means this release namespace.
+  namespace: ""
+  # Supply only at deploy time from the CD platform's secret manager.
+  value: ""
+  # Keep the Secret on helm uninstall: the controller finalizer still needs it
+  # to deregister the agent while the agent object is deleted.
+  keep: true
+
+# Registers a Git repository in the bundled Argo CD (Secret labelled
+# argocd.argoproj.io/secret-type: repository, in the release namespace).
+# githubAppID and githubAppInstallationID must be QUOTED strings. Give the
+# private key raw (githubAppPrivateKey, multiline PEM), base64-encoded
+# (githubAppPrivateKeyB64, one line), or the whole credential as one
+# single-line JSON object (githubAppJson).
+gitSecret:
+  create: false
+  name: bootstrap-repo
+  url: ""
+  githubAppID: ""
+  githubAppInstallationID: ""
+  githubAppPrivateKey: ""
+  githubAppPrivateKeyB64: ""
+  githubAppJson: ""
+  # Optional Argo repository display name.
+  repoName: ""
+  # Optional AppProject the repository is scoped to. Empty = global.
+  project: ""
+  # Also render a global repo-creds Secret (<name>-creds) with the same
+  # credential: ApplicationSet git generators resolve credentials outside any
+  # AppProject, so a project-scoped repository alone is invisible to them.
+  credsTemplate: false
+
+# Hub self-registration: an Argo CD cluster Secret naming THIS cluster, with
+# the labels the root ApplicationSet selects on. A plain resource, not a hook.
+hubCluster:
+  enabled: false
+  # Argo cluster name AND Secret name.
+  name: hub-cluster
+  server: https://kubernetes.default.svc
+  fleetMember: hub-cluster
+  # Extra labels/annotations stamped on the Secret.
+  labels: {}
+  annotations: {}
+
+# Root ApplicationSet: one root Application per hub-labelled cluster Secret,
+# syncing a flat folder of ApplicationSets. A post-install/post-upgrade hook,
+# so it can ship in the same release as the Argo CRDs.
+rootAppSet:
+  enabled: false
+  name: cluster-application-sets
+  # Which cluster Secrets count as hubs. Never empty.
+  selector:
+    fleet_member: hub-cluster
+  # Empty falls back to gitSecret.url.
+  repoURL: ""
+  path: gitops/bootstrap
+  targetRevision: HEAD
+  # Literal destination cluster name instead of the generator placeholder.
+  # Needed only when this chart is rendered through the Harness Argo plugin.
+  destinationName: ""
+  # AppProject of the root Application.
+  project: default
+  # Also create that AppProject as a hook (weight 0, before the
+  # ApplicationSet), with gitopsAgent.appProject.description. Use this instead
+  # of gitopsAgent.appProject.enabled when this release installs the Argo CRDs.
+  createProject: false

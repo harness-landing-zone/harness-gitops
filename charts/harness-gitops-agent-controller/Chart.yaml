@@ -1,17 +1,17 @@
 apiVersion: v2
-name: harness-gitops-agent-controller
+appVersion: v0.1.0
 description: Helm chart for the Harness GitOps Agent Kubernetes controller
-type: application
-version: 0.8.0
-appVersion: "v0.5.0"
-kubeVersion: ">=1.25.0-0"
+home: https://github.com/harness/gitops-helm
 keywords:
-  - harness
-  - gitops
-  - controller
-  - operator
-home: https://github.com/markoskandylis/harness-gitops-agent-operator
-sources:
-  - https://github.com/markoskandylis/harness-gitops-agent-operator
+- harness
+- gitops
+- controller
+- operator
+kubeVersion: '>=1.25.0-0'
 maintainers:
-  - name: markoskandylis
+- name: harness
+name: harness-gitops-agent-controller
+sources:
+- https://github.com/harness/gitops-helm
+type: application
+version: 0.1.0

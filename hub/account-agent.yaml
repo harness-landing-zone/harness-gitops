@@ -1,59 +1,33 @@
 # Day-0 values for the ACCOUNT-scoped hub agent. Consumed by service
-# hga_account_agent.
+# hga_account_agent, which installs charts/gitops-agent.
 #
 # Harness resolves expressions in this file before Helm renders the chart, so
 # secrets reach only Kubernetes and never git. Comments are evaluated too, so
 # never write expression syntax in a comment.
 #
-# global must stay at the values root: helm only propagates it into subcharts
-# from there.
-global:
-  image:
-    repository: docker.io/harness/argocd
-    tag: v3.3.10
+# No image versions are set here on purpose: the official chart's own defaults
+# for Argo CD, redis and the agent are the tested combination.
 
-harnessAgent:
-  metadata:
-    name: <+serviceVariables.agent_name>
-  spec:
-    name: <+serviceVariables.agent_name>
-    scope: <+serviceVariables.agent_scope>
-    tokenSecretRef: <+serviceVariables.token_secret>
-  apiKeySecret:
-    # The ONE central API-key Secret. The controller reads it from its own
-    # namespace, hga-system, for every agent on the hub, org agents included.
-    create: true
-    namespace: hga-system
-    value: '<+secrets.getValue("HGA-Token")>'
-  # Registers this repo in the bundled Argo CD. The credential is one
-  # single-line JSON secret holding githubAppID, githubAppInstallationID and
-  # githubAppPrivateKeyB64, all as strings.
-  gitSecret:
-    create: true
-    url: <+serviceVariables.repo_url>
-    project: default
-    # ApplicationSet git generators resolve credentials outside any AppProject,
-    # so the credential must also exist as a global template.
-    credsTemplate: true
-    githubAppJson: '<+secrets.getValue("hga_github_app")>'
+# The ONE central API-key Secret, named by
+# gitopsAgent.harnessAgent.spec.apiKeySecretRef. The controller reads it from
+# its own namespace, hga-system, for every agent on the hub, org agents
+# included.
+apiKeySecret:
+  create: true
+  namespace: hga-system
+  value: '<+secrets.getValue("HGA-Token")>'
 
-# Maps AppProject default to the Harness project the pipeline runs in. That
-# pairing is what files everything this hub bootstraps under that project;
-# rootAppSet.project below must name the same AppProject.
-projectMappings:
-  - name: hub-admin
-    appProject: default
-    orgId: <+org.identifier>
-    projectId: <+project.identifier>
-    autoCreateServiceEnv: false
-
-# The official appProject template refuses to render until the AppProject CRD
-# exists, and this release installs that CRD, so it stays off. The root
-# ApplicationSet hook creates the AppProject named by rootAppSet.project
-# instead (createProject below); description is read from here.
-appProject:
-  enabled: false
-  description: Admin AppProject for the hub
+# Registers this repo in the bundled Argo CD. The credential is one
+# single-line JSON secret holding githubAppID, githubAppInstallationID and
+# githubAppPrivateKeyB64, all as strings.
+gitSecret:
+  create: true
+  url: <+serviceVariables.repo_url>
+  project: default
+  # ApplicationSet git generators resolve credentials outside any AppProject,
+  # so the credential must also exist as a global template.
+  credsTemplate: true
+  githubAppJson: '<+secrets.getValue("hga_github_app")>'
 
 # The hub cluster Secret is the only per-hub input. Every ApplicationSet under
 # bootstrap/ selects on fleet_member and reads the rest from here. The
@@ -71,10 +45,35 @@ rootAppSet:
   enabled: true
   path: bootstrap
   project: default
+  # Creates AppProject default as a hook, see gitopsAgent.appProject below.
   createProject: true
 
 gitopsAgent:
   enabled: true
+  harnessAgent:
+    enabled: true
+    metadata:
+      name: <+serviceVariables.agent_name>
+    spec:
+      name: <+serviceVariables.agent_name>
+      scope: <+serviceVariables.agent_scope>
+      tokenSecretRef: <+serviceVariables.token_secret>
+  # Maps AppProject default to the Harness project the pipeline runs in. That
+  # pairing is what files everything this hub bootstraps under that project;
+  # rootAppSet.project above must name the same AppProject.
+  projectMappings:
+    - name: hub-admin
+      appProject: default
+      orgId: <+org.identifier>
+      projectId: <+project.identifier>
+      autoCreateServiceEnv: false
+  # The official appProject template refuses to render until the AppProject
+  # CRD exists, and this release installs that CRD, so it stays off. The root
+  # ApplicationSet hook creates the AppProject named by rootAppSet.project
+  # instead (rootAppSet.createProject); description is read from here.
+  appProject:
+    enabled: false
+    description: Admin AppProject for the hub
   harness:
     gitopsServerHost: https://app.harness.io/prod1/gitops
     configMap:
@@ -97,7 +96,3 @@ gitopsAgent:
     configs:
       cm:
         cluster.inClusterEnabled: true
-    redis:
-      image:
-        repository: docker.io/harness/redis
-        tag: 7.4.8

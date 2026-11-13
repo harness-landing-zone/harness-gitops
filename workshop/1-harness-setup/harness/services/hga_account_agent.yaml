@@ -19,7 +19,7 @@ service:
                 spec:
                   connectorRef: hga_github
                   gitFetchType: Commit
-                  folderPath: charts/harness-gitops-agent-bootstrap
+                  folderPath: charts/gitops-agent
                   repoName: harness-gitops
                   commitId: <+input>
               valuesPaths:

@@ -1,8 +1,9 @@
-# Fed the same org values file as the bootstrap chart. Only these keys and
-# projectMappings[].appProject are read here.
+# Fed the same org values file as charts/gitops-agent. Only these keys and
+# gitopsAgent.projectMappings[].appProject are read here.
 
 # One AppProject per entry, named by its appProject.
-projectMappings: []
+gitopsAgent:
+  projectMappings: []
 
 # Where the org's Argo CD may deploy. Required. Drives the Namespaces, the
 # Roles and the cluster Secret allowlist, so they cannot drift apart. Each

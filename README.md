@@ -36,8 +36,9 @@ flowchart LR
 
 1. **Bootstrap the hub.** The Harness pipeline `hga_hub_bootstrap` installs two
    Helm charts with Native Helm: the HGA controller into `hga-system`, then the
-   ACCOUNT-scoped agent into `hga-hub-agent`. The agent chart also creates the
-   bundled Argo CD, the repo credential, the hub cluster Secret and the root
+   ACCOUNT-scoped agent into `hga-hub-agent` (`charts/gitops-agent`), which
+   also creates the central API-key Secret in `hga-system`, the bundled Argo
+   CD, the repo credential, the hub cluster Secret and the root
    ApplicationSet, which syncs `bootstrap/` flat.
 2. **Point it at an environment.** The Harness Environment chosen when the
    pipeline runs is stamped on the hub cluster Secret. That Secret is the only
@@ -54,7 +55,7 @@ flowchart LR
 3. **Add an org file.** `bootstrap/orgs.yaml` pairs the hub cluster with
    `environments/<env>/orgs/<name>/values.yaml`. Each file becomes one
    Application, `org-<name>`, with two Helm sources fed the same file:
-   `charts/harness-gitops-agent-bootstrap` (a namespaced Argo CD with no
+   `charts/gitops-agent` (a namespaced Argo CD with no
    ClusterRoles, the ORG agent, the project mappings) and
    `charts/org-platform` (the workload namespaces, Roles in them, a restricted
    cluster entry and the AppProjects). `<name>` is the namespace of the org's
@@ -69,14 +70,23 @@ a DNS name.
 
 ```
 harness-gitops/
-├── charts/        controller and bootstrap (vendored), org-platform (the walls)
-├── harness/       pipeline, 2 services, environment, 2 infrastructures
+├── charts/        harness-gitops-agent-controller, gitops-agent, org-platform
 ├── hub/           day-0 values: controller.yaml, account-agent.yaml
 ├── bootstrap/     orgs.yaml (read flat by the root Application)
 ├── environments/<env>/orgs/<name>/values.yaml
+├── workshop/1-harness-setup/harness/  pipeline, 2 services, environment, 2 infrastructures
 └── examples/org/   values.yaml (template for one org file) and
                     sample-application.yaml (what a developer creates)
 ```
+
+Both official charts are vendored copies of the published releases
+(github.com/harness/gitops-helm/releases): `harness-gitops-agent-controller`
+0.1.0 verbatim, and `gitops-helm` 1.2.12 as the released tarball inside
+`charts/gitops-agent`. That chart only adds four optional hub templates on top
+(API-key Secret, repo credential, hub cluster Secret, root ApplicationSet) and
+nests every gitops-helm value under `gitopsAgent:`. `org-platform` is ours.
+Switching to Harness's remote chart repository is planned once its index lists
+these versions.
 
 Only files under `hub/` may use Harness expressions. Files under
 `environments/` are plain Helm values, because Argo CD cannot resolve them.
@@ -93,7 +103,7 @@ Only files under `hub/` may use Harness expressions. Files under
 - The GitHub App installed on this repo.
 - Connector `hga_github` (GitHub App, on the org that holds this repo). No
   registry connector is needed: the controller image is public.
-- The entities under `harness/` created in the project (org
+- The entities under `workshop/1-harness-setup/harness/` created in the project (org
   `gitops_reference`, project `gitops_admin`).
 
 `workshop/1-harness-setup/` creates all of the above except the
@@ -176,8 +186,8 @@ What remains:
   (a hook) instead.
 - Never rename an org folder. The folder name is the Helm release name, which
   is baked into immutable Deployment selectors.
-- `tokenSecretRef` must equal `gitopsAgent.agent.existingSecrets.agentToken`, or
-  the chart refuses to render.
+- `gitopsAgent.harnessAgent.spec.tokenSecretRef` must equal
+  `gitopsAgent.agent.existingSecrets.agentToken`, or the chart refuses to render.
 - `org-platform` refuses to render without `workloadNamespaces`, with a
   namespace that does not start with `<name>-`, with `appProject: default`, or
   with a duplicate `appProject`.
@@ -185,7 +195,8 @@ What remains:
 - A second controller on one cluster collides on cluster-scoped CRDs.
 - An ApplicationSet that matches nothing still reports success. Check
   `kubectl get applications`, not ApplicationSet status.
-- Update the vendored charts by re-copying (bootstrap: see its README).
+- Update the vendored charts from the release assets (gitops-agent: see its
+  README).
 
 ## Not included yet
 
