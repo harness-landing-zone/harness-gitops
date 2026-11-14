@@ -30,6 +30,10 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   syncPolicy:
     preserveResourcesOnDeletion: true
+    # Never delete a generated Application. A stage file or label that goes
+    # missing, even for the seconds the repo cache needs after a push, would
+    # otherwise delete every spoke's Application. Removing a spoke stays manual.
+    applicationsSync: create-update
   generators:
     - matrix:
         generators:
