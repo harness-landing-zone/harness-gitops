@@ -1,0 +1,23 @@
+# Every bu1 spoke (labels tenant: bu1, any stage). A stage file, then an
+# optional clusters/<spoke>/values.yaml, override this; write here only what all
+# bu1 spokes share. Lists are replaced, not merged: a lower file that sets
+# projectMappings must list every team it wants.
+# The agent's identity, scope and key are set by bootstrap/, not here.
+# Plain values only: Argo cannot resolve Harness expressions.
+
+gitopsAgent:
+  harness:
+    gitopsServerHost: https://app.harness.io/prod1/gitops
+  # One team = one Harness project = one AppProject on the spoke, plus its
+  # deny-all shadow beside the agent object on the hub.
+  projectMappings:
+    - name: team-a
+      appProject: team-a
+      projectId: team_a
+    - name: team-b
+      appProject: team-b
+      projectId: team_b
+
+# The repos every team AppProject on the spoke may deploy from.
+sourceRepos:
+  - https://github.com/argoproj/argocd-example-apps.git

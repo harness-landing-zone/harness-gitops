@@ -5,13 +5,14 @@
 # the agent and writes its token here; the token is then carried to the spoke
 # (local/carry-token.sh <env> <spoke>-agent-token).
 #
-# The spoke half is bootstrap/spoke-bootstrap.yaml. Keep the identity values
+# The spoke half is bootstrap/spoke-runtime.yaml. Keep the identity values
 # below equal in both files: the agent's name, identifier, org and token name.
 #
-# Values: tenants/<business_unit>/<environment>/spokes.yaml (the BU's teams;
-# its revision key pins charts and values for that group), then the valuesObject
-# below, which the file cannot override. Agent identity is immutable, so never
-# rename a spoke's cluster Secret.
+# Values, lowest first: tenants/<tenant>/gitops-agents/defaults/values.yaml,
+# <stage>/values.yaml (required; its revision is the upgrade group: bump
+# nonprod first, then prod), clusters/<spoke>/values.yaml (optional), then the
+# valuesObject below, which no tenant file can override. Agent identity is
+# immutable, so never rename a spoke's cluster Secret.
 #
 # No metadata.namespace: the root Application applies this into the hub
 # agent's namespace. A selector or path that matches nothing still reports
@@ -22,7 +23,7 @@ metadata:
   name: agent-registration
 spec:
   goTemplate: true
-  # Templates read cluster metadata and paths, plus the spokes file's revision.
+  # Templates read cluster metadata and paths, plus the stage file's revision.
   # If revision is missing, generation stops for every spoke, and the existing
   # Applications keep their last revision.
   goTemplateOptions: ["missingkey=error"]
@@ -40,13 +41,13 @@ spec:
                 # A spoke without these labels is skipped, instead of failing
                 # generation for every spoke.
                 matchExpressions:
-                  - {key: environment, operator: Exists}
-                  - {key: business_unit, operator: Exists}
+                  - {key: stage, operator: Exists}
+                  - {key: tenant, operator: Exists}
           - git:
               repoURL: '{{ .metadata.annotations.repo_url }}'
               revision: HEAD
               files:
-                - path: 'tenants/{{ .metadata.labels.business_unit }}/{{ .metadata.labels.environment }}/spokes.yaml'
+                - path: 'tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
   template:
     metadata:
       name: '{{ .name }}-registration'
@@ -62,12 +63,17 @@ spec:
           ref: values
         - repoURL: '{{ .metadata.annotations.repo_url }}'
           targetRevision: '{{ .revision }}'
-          path: charts/agent-registration
+          path: charts/fleet-member-registration
           helm:
             releaseName: '{{ .name }}'
+            # defaults, then the stage file the generator found, then one
+            # cluster's exceptions. Only the stage file must exist.
+            ignoreMissingValueFiles: true
             valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
               - '$values/{{ .path.path }}/{{ .path.filename }}'
-            # Enforced by the platform over the spokes file.
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/clusters/{{ .name }}/values.yaml'
+            # Enforced by the platform over the tenant files.
             valuesObject:
               spoke: false
               gitopsAgent:
@@ -80,12 +86,12 @@ spec:
                     # file's choice, and the agent never adopts another one.
                     scope: ORG
                     existingAgentIdentifier: ""
-                    apiKeySecretRef: 'harness-api-key-{{ .metadata.labels.business_unit }}'
+                    apiKeySecretRef: 'harness-api-key-{{ .metadata.labels.tenant }}'
                     tokenSecretRef: '{{ .name }}-agent-token'
                 harness:
                   identity:
                     accountIdentifier: '{{ .metadata.annotations.harness_account_id }}'
-                    orgIdentifier: '{{ .metadata.labels.business_unit }}'
+                    orgIdentifier: '{{ .metadata.labels.tenant }}'
                     projectIdentifier: ""
                     agentIdentifier: '{{ .name | replace "-" "_" }}'
       destination:

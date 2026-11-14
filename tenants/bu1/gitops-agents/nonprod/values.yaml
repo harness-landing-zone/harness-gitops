@@ -1,0 +1,14 @@
+# bu1 spokes labelled stage: nonprod. Required: the ApplicationSets select this file
+# by the spoke's labels, and read revision from it. Layered over
+# ../defaults/values.yaml.
+
+# The upgrade group: charts and values for these spokes come from this revision
+# of the repo. Bump nonprod first, then prod once nonprod is healthy. Pin a
+# commit SHA or a tag; HEAD follows main and is only for the first test.
+revision: HEAD
+
+# The namespaces every team AppProject on these spokes may deploy to; the
+# platform creates them.
+destinationNamespaces:
+  - dev
+  - test

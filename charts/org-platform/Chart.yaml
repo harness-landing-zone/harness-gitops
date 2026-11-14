@@ -1,8 +1,0 @@
-apiVersion: v2
-name: org-platform
-description: >-
-  Platform half of an org shard: the org's workload namespaces, the Roles that
-  let its namespaced Argo CD deploy there, a restricted cluster entry and the
-  AppProject fence.
-type: application
-version: 0.1.0

@@ -13,6 +13,11 @@ metadata:
     app.kubernetes.io/name: {{ $.Chart.Name }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
+  annotations:
+    # Argo CD never deletes this, whoever deletes or prunes the Application:
+    # deleting it runs the controller finalizer, which deregisters the agent
+    # in Harness and removes its mappings. Offboarding is a manual delete.
+    argocd.argoproj.io/sync-options: Delete=false
 spec:
   agentRef:
     name: {{ $.Values.gitopsAgent.harnessAgent.metadata.name | quote }}

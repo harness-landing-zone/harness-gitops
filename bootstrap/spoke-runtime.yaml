@@ -10,10 +10,10 @@
 # (local/carry-token.sh <env> <spoke>-agent-token), the agent pod waits
 # (CreateContainerConfigError) and then starts on its own.
 #
-# Values: tenants/<business_unit>/<environment>/spokes.yaml (the BU's teams;
-# its revision key is the upgrade group: bump nonprod first, then prod), then
-# the valuesObject of each source, which the file cannot override. No
-# RollingSync: it needs progressive syncs, which the hub does not enable.
+# Values, lowest first: tenants/<tenant>/gitops-agents/defaults/values.yaml,
+# <stage>/values.yaml (required; its revision is the upgrade group: bump
+# nonprod first, then prod), clusters/<spoke>/values.yaml (optional), then the
+# valuesObject below, which no tenant file can override.
 #
 # No metadata.namespace: the root Application applies this into the hub
 # agent's namespace. A selector or path that matches nothing still reports
@@ -21,10 +21,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: spoke-bootstrap
+  name: spoke-runtime
 spec:
   goTemplate: true
-  # Templates read cluster metadata and paths, plus the spokes file's revision.
+  # Templates read cluster metadata and paths, plus the stage file's revision.
   # If revision is missing, generation stops for every spoke, and the existing
   # Applications keep their last revision.
   goTemplateOptions: ["missingkey=error"]
@@ -40,13 +40,13 @@ spec:
                 # A spoke without these labels is skipped, instead of failing
                 # generation for every spoke.
                 matchExpressions:
-                  - {key: environment, operator: Exists}
-                  - {key: business_unit, operator: Exists}
+                  - {key: stage, operator: Exists}
+                  - {key: tenant, operator: Exists}
           - git:
               repoURL: '{{ .metadata.annotations.repo_url }}'
               revision: HEAD
               files:
-                - path: 'tenants/{{ .metadata.labels.business_unit }}/{{ .metadata.labels.environment }}/spokes.yaml'
+                - path: 'tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
   template:
     metadata:
       name: '{{ .name }}-runtime'
@@ -68,8 +68,13 @@ spec:
             # Never change: the argo-cd subchart bakes it into immutable
             # selectors.
             releaseName: hga-agent
+            # defaults, then the stage file the generator found, then one
+            # cluster's exceptions. Only the stage file must exist.
+            ignoreMissingValueFiles: true
             valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
               - '$values/{{ .path.path }}/{{ .path.filename }}'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/clusters/{{ .name }}/values.yaml'
             valuesObject:
               gitopsAgent:
                 # Registration happens on the hub, so the spoke has no agent
@@ -86,7 +91,7 @@ spec:
                 harness:
                   identity:
                     accountIdentifier: '{{ .metadata.annotations.harness_account_id }}'
-                    orgIdentifier: '{{ .metadata.labels.business_unit }}'
+                    orgIdentifier: '{{ .metadata.labels.tenant }}'
                     projectIdentifier: ""
                     agentIdentifier: '{{ .name | replace "-" "_" }}'
                 agent:
@@ -96,7 +101,7 @@ spec:
                     # create it: an empty token fails for the wrong reason.
                     agentToken: '{{ .name }}-agent-token'
                 argo-cd:
-                  # Arbitrary objects and extra cluster Secrets from a spokes
+                  # Arbitrary objects and extra cluster Secrets from a tenant
                   # file would bypass the AppProjects.
                   extraObjects: []
                   configs:
@@ -112,11 +117,16 @@ spec:
         # The team Namespaces, the real team AppProjects and a locked default.
         - repoURL: '{{ .metadata.annotations.repo_url }}'
           targetRevision: '{{ .revision }}'
-          path: charts/agent-registration
+          path: charts/fleet-member-registration
           helm:
             releaseName: hga-agent-projects
+            # defaults, then the stage file the generator found, then one
+            # cluster's exceptions. Only the stage file must exist.
+            ignoreMissingValueFiles: true
             valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
               - '$values/{{ .path.path }}/{{ .path.filename }}'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/clusters/{{ .name }}/values.yaml'
             valuesObject:
               spoke: true
       destination:
