@@ -1,0 +1,14 @@
+# Team a on bu1 nonprod spokes: AppProject team-a in the spoke's Argo CD.
+# Keyed by the AppProject name, so every team file merges into one map.
+# Only description, sourceRepos and destinations are read; the platform forces
+# the rest: no cluster-scoped resources, no gitops.harness.io objects.
+appProjects:
+  team-a:
+    description: Team a, bu1 nonprod
+    # Exact repository URLs the team's Applications may pull from.
+    sourceRepos:
+      - https://github.com/argoproj/argocd-example-apps.git
+    # Where on this spoke the team may deploy: any namespace starting team-a-.
+    destinations:
+      - server: https://kubernetes.default.svc
+        namespace: team-a-*

@@ -1,7 +1,15 @@
-{{- if not .Values.spoke }}
 {{- $a := .Values.gitopsAgent.harnessAgent }}
 {{- $id := .Values.gitopsAgent.harness.identity }}
 {{- $scope := upper (default "ORG" $a.spec.scope) }}
+{{- if not (has $scope (list "ACCOUNT" "ORG" "PROJECT")) }}
+{{- fail "gitopsAgent.harnessAgent.spec.scope must be ACCOUNT, ORG or PROJECT" }}
+{{- end }}
+{{- $token := required "gitopsAgent.harnessAgent.spec.tokenSecretRef is required" $a.spec.tokenSecretRef }}
+{{- with .Values.gitopsAgent.agent.existingSecrets.agentToken }}
+{{- if ne . $token }}
+{{- fail "gitopsAgent.harnessAgent.spec.tokenSecretRef must equal gitopsAgent.agent.existingSecrets.agentToken: the runtime reads the token the controller writes" }}
+{{- end }}
+{{- end }}
 apiVersion: gitops.harness.io/v1alpha1
 kind: HarnessGitopsAgent
 metadata:
@@ -12,10 +20,13 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   annotations:
-    # Argo CD never deletes this, whoever deletes or prunes the Application:
-    # deleting it runs the controller finalizer, which deregisters the agent
-    # in Harness and removes its mappings. Offboarding is a manual delete.
-    argocd.argoproj.io/sync-options: Delete=false
+    # Delete=false: Argo CD never deletes this, whoever deletes or prunes the
+    # Application; deleting it runs the controller finalizer, which deregisters
+    # the agent in Harness. Offboarding is a manual delete.
+    # SkipDryRunOnMissingResource: the controller's CRDs arrive in the same sync.
+    argocd.argoproj.io/sync-options: Delete=false,SkipDryRunOnMissingResource=true
+    # After the CRDs and the controller (wave 0).
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   name: {{ default $id.agentIdentifier $a.spec.name | quote }}
   identifier: {{ required "gitopsAgent.harness.identity.agentIdentifier is required" $id.agentIdentifier | quote }}
@@ -30,8 +41,7 @@ spec:
   scope: {{ $scope | quote }}
   type: {{ $a.spec.type | quote }}
   apiKeySecretRef: {{ required "gitopsAgent.harnessAgent.spec.apiKeySecretRef is required" $a.spec.apiKeySecretRef | quote }}
-  tokenSecretRef: {{ required "gitopsAgent.harnessAgent.spec.tokenSecretRef is required" $a.spec.tokenSecretRef | quote }}
+  tokenSecretRef: {{ $token | quote }}
   {{- with $a.spec.existingAgentIdentifier }}
   existingAgentIdentifier: {{ . | quote }}
   {{- end }}
-{{- end }}

@@ -1,47 +1,49 @@
-# Reads the same keys as charts/gitops-agent (under gitopsAgent), so one spoke
-# values file feeds the hub registration (this chart), the spoke runtime
-# (charts/gitops-agent with gitopsAgent.harnessAgent.enabled false and
-# gitopsAgent.projectMappings []) and the spoke's AppProjects (this chart with
-# spoke: true).
-
-# false (hub): agent object, project mappings and shadow AppProjects. The
-# controller registers the agent, writes its token Secret
-# (harnessAgent.spec.tokenSecretRef) here, and checks only that each mapped
-# AppProject exists in this namespace; the shadows are deny-all.
-# true (spoke): only the real AppProjects and the locked default.
-spoke: false
+# Same keys as charts/gitops-agent (gitopsAgent.*), so one values file feeds
+# this chart and the runtime. Everything renders into the release namespace,
+# beside the controller that registers it.
 
 gitopsAgent:
   harnessAgent:
     metadata:
-      # Required: the HarnessGitopsAgent name, referenced by every mapping.
+      # Required: the object's name.
       name: ""
     spec:
+      # Empty means the identifier.
       name: ""
       scope: ORG
       operator: ARGO
       type: MANAGED_ARGO_PROVIDER
-      # Required: a key Secret in the controller's key namespace (hga-system),
-      # for a BU agent its org-scoped key, for example harness-api-key-bu1.
+      # Required: the key Secret in the controller's namespace (hga-system).
       apiKeySecretRef: ""
-      # Required: the token Secret the controller writes beside this object;
-      # the runtime's gitopsAgent.agent.existingSecrets.agentToken must name the
-      # same Secret on the spoke.
+      # Required: the Secret the controller writes the agent's token to, in
+      # this namespace. Must equal agent.existingSecrets.agentToken.
       tokenSecretRef: ""
       existingAgentIdentifier: ""
+  # The runtime's token Secret; checked against tokenSecretRef when set.
+  agent:
+    existingSecrets:
+      agentToken: ""
+  # One per team: the team's AppProject (an appProjects entry below) and the
+  # Harness project in the agent's org it maps to.
+  #   - name: team-a
+  #     appProject: team-a
+  #     projectId: team_a
+  projectMappings: []
   harness:
     identity:
       accountIdentifier: ""
       orgIdentifier: ""
       projectIdentifier: ""
       agentIdentifier: ""
-  # One mapping and one AppProject per entry: {name, appProject, projectId,
-  # orgId (optional, the agent's org), autoCreateServiceEnv}. appProject must
-  # not be default.
-  projectMappings: []
 
-# Spoke only (spoke: true): what every team project may use. Each
-# destinationNamespaces entry is also created as a Namespace (kept on delete);
-# kube-*, default and the release namespace are refused.
-sourceRepos: []
-destinationNamespaces: []
+# One entry per team, keyed by the AppProject name (one file per team, merged).
+# Only these keys are read; the rest is forced: no cluster-scoped resources,
+# no gitops.harness.io objects.
+#   team-a:
+#     description: Team a
+#     sourceRepos:             # exact URLs, no patterns
+#       - https://github.com/example/team-a.git
+#     destinations:            # this cluster only; namespace starts "team-a-"
+#       - server: https://kubernetes.default.svc
+#         namespace: team-a-*
+appProjects: {}

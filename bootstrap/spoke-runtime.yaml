@@ -1,56 +1,56 @@
-# The spoke half of an agent on every spoke: per spoke cluster Secret
-# (fleet_member: spoke), one Application <spoke>-runtime on that spoke, in
-# namespace <spoke>. It holds a cluster-wide Argo CD with its CRDs, the agent,
-# and the team Namespaces and AppProjects. The namespace matches the hub side,
-# because the controller registers the agent with its object's namespace.
+# Everything an agent needs on its spoke, in one go. For every spoke cluster
+# Secret (fleet_member: spoke, with tenant and stage labels) it makes one
+# Application <spoke>-runtime on that spoke, with three charts installed in
+# sync waves:
 #
-# The hub half, which registers the agent and receives its token, is
-# bootstrap/agent-registration.yaml. Keep the identity values below equal in
-# both files. Until the token is carried
-# (local/carry-token.sh <env> <spoke>-agent-token), the agent pod waits
-# (CreateContainerConfigError) and then starts on its own.
+#   wave 0  charts/harness-gitops-agent-controller, in hga-system: the
+#           controller and its CRDs. It registers the agent in Harness with the
+#           key Secret harness-api-key-secret in hga-system, which the platform
+#           creates by hand on each spoke, together with the namespace; never
+#           in git.
+#   wave 0  charts/gitops-agent, in <spoke>: Argo CD with its CRDs, and the
+#           agent's config.
+#   wave 1  charts/fleet-member-registration, in <spoke>: the HarnessGitopsAgent
+#           and the team AppProjects (tenants/<tenant>/gitops-agents/<stage>/
+#           teams/<team>/values.yaml), plus a locked default.
+#   wave 2  the same chart: one project mapping per team.
+#   wave 3  the agent Deployment. The controller writes <spoke>-agent-token
+#           beside it; nothing carries a token between clusters.
 #
-# Values, lowest first: tenants/<tenant>/gitops-agents/defaults/values.yaml,
-# <stage>/values.yaml (required; its revision is the upgrade group: bump
-# nonprod first, then prod), clusters/<spoke>/values.yaml (optional), then the
-# valuesObject below, which no tenant file can override.
+# Values, lowest first: tenants/<tenant>/gitops-agents/defaults/values.yaml
+# (every spoke of the tenant), <stage>/values.yaml (the stage's mappings), and
+# for the third chart <stage>/teams/*/values.yaml; missing files are skipped.
+#
+# Argo CD finishes each wave, Healthy, before the next. Identity comes from the
+# cluster Secret: org <tenant>, ORG scope, identifier <spoke> with "_". It is
+# immutable, so never rename a spoke's cluster Secret or change its tenant.
 #
 # No metadata.namespace: the root Application applies this into the hub
-# agent's namespace. A selector or path that matches nothing still reports
-# success, so check with `kubectl get applications`.
+# agent's namespace. A selector that matches nothing still reports success, so
+# check with `kubectl get applications`.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: spoke-runtime
 spec:
   goTemplate: true
-  # Templates read cluster metadata and paths, plus the stage file's revision.
-  # If revision is missing, generation stops for every spoke, and the existing
-  # Applications keep their last revision.
   goTemplateOptions: ["missingkey=error"]
   syncPolicy:
+    # Deleting an Application never deletes the agent object, whose finalizer
+    # would deregister the agent in Harness.
     preserveResourcesOnDeletion: true
-    # Never delete a generated Application. A stage file or label that goes
-    # missing, even for the seconds the repo cache needs after a push, would
-    # otherwise delete every spoke's Application. Removing a spoke stays manual.
+    # Never delete a generated Application. Removing a spoke stays manual.
     applicationsSync: create-update
   generators:
-    - matrix:
-        generators:
-          - clusters:
-              selector:
-                matchLabels:
-                  fleet_member: spoke
-                # A spoke without these labels is skipped, instead of failing
-                # generation for every spoke.
-                matchExpressions:
-                  - {key: stage, operator: Exists}
-                  - {key: tenant, operator: Exists}
-          - git:
-              repoURL: '{{ .metadata.annotations.repo_url }}'
-              revision: HEAD
-              files:
-                - path: 'tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: spoke
+          # A spoke without these labels is skipped, instead of failing
+          # generation for every spoke.
+          matchExpressions:
+            - {key: tenant, operator: Exists}
+            - {key: stage, operator: Exists}
   template:
     metadata:
       name: '{{ .name }}-runtime'
@@ -62,34 +62,37 @@ spec:
       project: default
       sources:
         - repoURL: '{{ .metadata.annotations.repo_url }}'
-          targetRevision: '{{ .revision }}'
+          targetRevision: HEAD
           ref: values
-        # Argo CD and the agent runtime. Its agent object lives on the hub.
+        # Wave 0: the controller, alone in hga-system (the chart's defaults).
         - repoURL: '{{ .metadata.annotations.repo_url }}'
-          targetRevision: '{{ .revision }}'
+          targetRevision: HEAD
+          path: charts/harness-gitops-agent-controller
+          helm:
+            releaseName: hga-controller
+            namespace: hga-system
+        # Wave 0: Argo CD and the agent runtime; the agent Deployment is wave 3.
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
           path: charts/gitops-agent
           helm:
             # Never change: the argo-cd subchart bakes it into immutable
             # selectors.
             releaseName: hga-agent
-            # defaults, then the stage file the generator found, then one
-            # cluster's exceptions. Only the stage file must exist.
             ignoreMissingValueFiles: true
             valueFiles:
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
-              - '$values/{{ .path.path }}/{{ .path.filename }}'
-              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/clusters/{{ .name }}/values.yaml'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
             valuesObject:
               gitopsAgent:
-                # Registration happens on the hub, so the spoke has no agent
-                # object, no mappings and nothing that needs a key.
+                # The agent object and mappings come from the third chart.
                 harnessAgent:
                   enabled: false
                 # A real empty list: gitops-helm fails if mappings exist while
                 # the agent object is off, and a null breaks its len check.
                 projectMappings: []
-                # Needs the CRDs at render time; the second chart below renders
-                # the AppProjects instead.
+                # Needs the CRDs at render time; the third chart renders the
+                # AppProjects instead.
                 appProject:
                   enabled: false
                 harness:
@@ -101,9 +104,13 @@ spec:
                 agent:
                   harnessName: '{{ .name }}'
                   existingSecrets:
-                    # The Secret the token is carried into. Never let the chart
-                    # create it: an empty token fails for the wrong reason.
+                    # Written by the controller. Never let the chart create it:
+                    # an empty token fails for the wrong reason.
                     agentToken: '{{ .name }}-agent-token'
+                  # Last: it is Healthy only once the controller has written
+                  # its token, and must not hold back the other waves.
+                  deploymentAnnotations:
+                    argocd.argoproj.io/sync-wave: "3"
                 argo-cd:
                   # Arbitrary objects and extra cluster Secrets from a tenant
                   # file would bypass the AppProjects.
@@ -118,21 +125,45 @@ spec:
                 enabled: false
               hubCluster:
                 enabled: false
-        # The team Namespaces, the real team AppProjects and a locked default.
+        # Waves 1 and 2: the agent object, the team AppProjects and mappings.
         - repoURL: '{{ .metadata.annotations.repo_url }}'
-          targetRevision: '{{ .revision }}'
+          targetRevision: HEAD
           path: charts/fleet-member-registration
           helm:
-            releaseName: hga-agent-projects
-            # defaults, then the stage file the generator found, then one
-            # cluster's exceptions. Only the stage file must exist.
+            releaseName: '{{ .name }}'
+            # Optional files: a stage without teams gets only the locked
+            # default.
             ignoreMissingValueFiles: true
             valueFiles:
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
-              - '$values/{{ .path.path }}/{{ .path.filename }}'
-              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/clusters/{{ .name }}/values.yaml'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
+            # Enforced over the tenant files. Keep equal to the runtime's
+            # identity above.
             valuesObject:
-              spoke: true
+              gitopsAgent:
+                harnessAgent:
+                  metadata:
+                    name: '{{ .name }}'
+                  spec:
+                    name: '{{ .name }}'
+                    # Scope, kind and key are never a tenant file's choice, and
+                    # the agent never adopts another one.
+                    scope: ORG
+                    operator: ARGO
+                    type: MANAGED_ARGO_PROVIDER
+                    existingAgentIdentifier: ""
+                    apiKeySecretRef: harness-api-key-secret
+                    tokenSecretRef: '{{ .name }}-agent-token'
+                agent:
+                  existingSecrets:
+                    agentToken: '{{ .name }}-agent-token'
+                harness:
+                  identity:
+                    accountIdentifier: '{{ .metadata.annotations.harness_account_id }}'
+                    orgIdentifier: '{{ .metadata.labels.tenant }}'
+                    projectIdentifier: ""
+                    agentIdentifier: '{{ .name | replace "-" "_" }}'
       destination:
         name: '{{ .name }}'
         namespace: '{{ .name }}'
