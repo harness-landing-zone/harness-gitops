@@ -52,7 +52,9 @@ spec:
       name: '{{ .name }}-runtime'
       labels:
         app.kubernetes.io/part-of: spoke-bootstrap
-        spoke: '{{ .name }}'
+        cluster: '{{ .name }}'
+        tenant: '{{ .metadata.labels.tenant }}'
+        stage: '{{ .metadata.labels.stage }}'
         role: runtime
     spec:
       project: default

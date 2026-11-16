@@ -2,7 +2,7 @@
 # hub (and fleet_member: spoke, tenant and stage labels) it makes one
 # Application on the hub, in namespace <spoke>:
 #
-#   <spoke>-registration  charts/fleet-member-registration (target hub): the
+#   <spoke>-agent  charts/fleet-member-registration (target hub): the
 #     HarnessGitopsAgent and the PushSecret that copies the agent's token to
 #     the spoke, wave 1 and 2. Then charts/teams-bootstrap (target hub): one
 #     mapping per team with a deny-all placeholder AppProject. Only the hub's
@@ -45,16 +45,20 @@ spec:
             - {key: stage, operator: Exists}
   template:
     metadata:
-      name: '{{ .name }}-registration'
+      name: '{{ .name }}-agent'
       labels:
         app.kubernetes.io/part-of: spoke-bootstrap
-        spoke: '{{ .name }}'
+        cluster: '{{ .name }}'
+        tenant: '{{ .metadata.labels.tenant }}'
+        stage: '{{ .metadata.labels.stage }}'
         role: registration
     spec:
       project: default
-      # The hub itself: the objects live beside the hub's controller.
+      # The hub itself: the objects live beside the hub's controller. The
+      # hub's cluster Secret is named hub-cluster (charts/gitops-agent
+      # hubCluster.name).
       destination:
-        server: https://kubernetes.default.svc
+        name: hub-cluster
         namespace: '{{ .name }}'
       syncPolicy:
         automated:

@@ -3,7 +3,7 @@
 # Argo CD cluster name and the cluster Secret name; the file says how the
 # cluster is bootstrapped (tenant, stage, gitopsAgent, agentModel).
 #
-# For each file this makes Application register-<cluster> on the hub
+# For each file this makes Application <cluster>-cluster on the hub
 # (charts/cluster-registration). ESO then creates that cluster Secret in
 # hga-hub-agent from OpenBao clusters/<cluster>. Only the connection (server,
 # CA, token) is in the store; the labels (tenant, stage, fleet_member) come
@@ -45,10 +45,13 @@ spec:
                 - path: fleet-members/*.yaml
   template:
     metadata:
-      name: 'register-{{ trimSuffix ".yaml" .path.filename }}'
+      name: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
       labels:
         app.kubernetes.io/part-of: cluster-registration
         cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+        # From the member file; "" when a file leaves them out.
+        tenant: '{{ default "" (index . "tenant") }}'
+        stage: '{{ default "" (index . "stage") }}'
     spec:
       project: default
       sources:
@@ -77,7 +80,7 @@ spec:
                 repo_url: '{{ .metadata.annotations.repo_url }}'
                 harness_account_id: '{{ .metadata.annotations.harness_account_id }}'
       destination:
-        server: https://kubernetes.default.svc
+        name: '{{ .name }}'
         namespace: hga-hub-agent
       syncPolicy:
         automated:
