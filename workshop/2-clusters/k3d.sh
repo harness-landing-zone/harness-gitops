@@ -14,8 +14,8 @@
 #   k3d.sh register          write every hga-spoke-* cluster's connection into
 #                            OpenBao on the hub (clusters/spoke-<x>)
 #   k3d.sh spoke <name>      create hga-<name> if missing, pin it, register it
-#   k3d.sh store-key <name>  write $HARNESS_API_KEY into OpenBao on the hub
-#                            (harness-api-keys/<name>, property api_key)
+#   k3d.sh store-key <path>  write $HARNESS_API_KEY into OpenBao on the hub at
+#                            <path> (under harness-api-keys/, property api_key)
 #   k3d.sh down [name...]    delete hga-<name> for each name; with none, every
 #                            hga-* cluster, the hub included
 set -euo pipefail
@@ -166,20 +166,24 @@ case "${1:-}" in
     register_spoke "$2"
     ;;
   store-key)
-    spoke_name "${2:-}"
+    # Under harness-api-keys/ only: never over a cluster connection (clusters/).
+    re='^harness-api-keys/[a-z0-9]([-a-z0-9_/]*[a-z0-9])?$'
+    [[ ${2:-} =~ $re ]] || { echo "$0: '${2:-}' is not harness-api-keys/<name>" >&2; exit 2; }
     [ -n "${HARNESS_API_KEY:-}" ] || { echo "$0: HARNESS_API_KEY is empty" >&2; exit 1; }
     # jq reads the key from its environment: never on a command line.
-    jq -nc '{api_key: env.HARNESS_API_KEY}' | bao_put "harness-api-keys/$2"
-    echo "stored harness-api-keys/$2 in OpenBao"
+    jq -nc '{api_key: env.HARNESS_API_KEY}' | bao_put "$2"
+    echo "stored $2 in OpenBao"
     ;;
   down)
     shift
     if [ $# -gt 0 ]; then set -- "${@/#/hga-}"; else set -- $(k3d_clusters hga-); fi
     [ $# -gt 0 ] || { echo "no hga-* clusters"; exit 0; }
-    k3d cluster delete "$@"
+    # The file create_cluster merged into: with several files in KUBECONFIG,
+    # k3d cannot pick one and leaves the context behind.
+    KUBECONFIG="$HOME/.kube/config" k3d cluster delete "$@"
     ;;
   *)
-    echo "usage: $0 hub|delegate <name>|pin [cluster...]|register|spoke <name>|store-key <name>|down [name...]" >&2
+    echo "usage: $0 hub|delegate <name>|pin [cluster...]|register|spoke <name>|store-key <path>|down [name...]" >&2
     exit 2
     ;;
 esac

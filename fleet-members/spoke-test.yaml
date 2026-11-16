@@ -16,4 +16,4 @@ gitopsAgent: true
 # hub's controller, the token pushed by ESO (label agent_model: hub).
 agentModel: ""
 # Api Secret name for the Spoke Model
-harnessSecretName: 
+harnessSecretName: harness-api-keys/spoke-test
