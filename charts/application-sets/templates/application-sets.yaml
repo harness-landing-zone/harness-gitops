@@ -1,0 +1,49 @@
+{{- range $name, $set := .Values.applicationSets }}
+{{- if ne $set.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ $name }}
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    {{- toYaml $.Values.syncPolicyAppSet | nindent 4 }}
+  {{- $clusters := dict "clusters" (dict "selector" (required (printf "%s: selector is required" $name) $set.selector)) }}
+  generators:
+    {{- if $set.gitFiles }}
+    - matrix:
+        generators:
+          {{- toYaml (list $clusters) | nindent 10 }}
+          - git:
+              repoURL: {{ $.Values.repoURL | quote }}
+              revision: {{ $.Values.revision | quote }}
+              files:
+                - path: {{ $set.gitFiles | quote }}
+    {{- else }}
+    {{- toYaml (list $clusters) | nindent 4 }}
+    {{- end }}
+  template:
+    metadata:
+      name: {{ required (printf "%s: name is required" $name) $set.name | quote }}
+      labels:
+        {{- toYaml (merge (dict) (deepCopy (default (dict) $set.labels)) $.Values.labels) | nindent 8 }}
+    spec:
+      project: {{ $.Values.project }}
+      destination:
+        name: {{ dig "name" "{{ .name }}" $set.destination | quote }}
+        namespace: {{ required (printf "%s: destination.namespace is required" $name) $set.destination.namespace | quote }}
+      {{- $sp := deepCopy $.Values.syncPolicy }}
+      {{- with $set.syncOptions }}
+      {{- $_ := set $sp "syncOptions" . }}
+      {{- end }}
+      syncPolicy:
+        {{- toYaml $sp | nindent 8 }}
+      sources:
+        {{- range $set.sources }}
+        -
+          {{- toYaml (merge (deepCopy .) (dict "repoURL" $.Values.repoURL "targetRevision" $.Values.revision)) | nindent 10 }}
+        {{- end }}
+{{- end }}
+{{- end }}

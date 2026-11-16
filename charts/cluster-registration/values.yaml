@@ -6,7 +6,8 @@
 secretStore:
   enabled: false
   name: hub-openbao
-# One per member. bootstrap/cluster-registration.yaml turns it on.
+# One per member. The cluster-registration entry in spoke-bootstrap/values.yaml
+# turns it on.
 externalSecret:
   enabled: false
 # The Argo CD cluster name and the cluster Secret name. Set by bootstrap/ from
