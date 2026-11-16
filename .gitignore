@@ -1,1 +1,7 @@
 .DS_Store
+# OpenTofu, in every root module: providers, and local and per-workspace state
+# (which holds tokens). .terraform.lock.hcl is committed on purpose.
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfstate.d/

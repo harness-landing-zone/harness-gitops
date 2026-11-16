@@ -5,11 +5,6 @@ github_app_installation_id = "REPLACE_WITH_INSTALLATION_ID"
 github_app_private_key_file = "~/.ssh/REPLACE_github_app.pem"
 # github_app_private_key_pkcs8_file = "~/.ssh/REPLACE_github_app.pkcs8.pem"
 
-# Spokes with their own controller: name => business unit (spoke-keys.tf).
-# Each gets a Harness key and a k3d cluster, both written into OpenBao.
-spokes = {}
-# spokes = { spoke-test = "bu1" }
-
 # Defaults; change only if you need to.
 # org_id            = "gitops_reference"
 # project_id        = "gitops_admin"

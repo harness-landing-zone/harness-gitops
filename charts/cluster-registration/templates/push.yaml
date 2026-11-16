@@ -1,13 +1,33 @@
 {{- /*
-Hub model only: lets ESO on the hub write into this spoke. The kubeconfig
-ExternalSecret builds a Secret from the same store entry as the cluster Secret
-(argocd-manager's long-lived token, so it is as powerful as the cluster
-Secret). The ClusterSecretStore reads it through authRef, so the spoke's URL
-stays in the store and out of git. Only the agent's own hub namespace
-(<cluster>) may use the store.
+Lets ESO on the hub write into this spoke, for one of two reasons:
+- Hub model: the agent's token (charts/fleet-member-registration's PushSecret)
+  goes through push-<cluster>, which only the agent's own hub namespace
+  (<cluster>) may use.
+- A self-managed spoke with harnessSecretName: its own controller's API key,
+  which workshop/2-clusters wrote into OpenBao, is pushed to
+  hga-system/harness-api-key-secret through push-<cluster>-hga-system, which
+  only this release's namespace may use. It errors and retries until the
+  spoke's controller has created hga-system.
+The kubeconfig ExternalSecret builds a Secret from the same store entry as the
+cluster Secret (argocd-manager's long-lived token, so it is as powerful as the
+cluster Secret). The push stores read it through authRef, so the spoke's URL
+stays in the store and out of git.
 */}}
-{{- if and .Values.externalSecret.enabled (eq .Values.agentModel "hub") }}
+{{- if .Values.externalSecret.enabled }}
 {{- $name := .Values.clusterName }}
+{{- $hub := eq .Values.agentModel "hub" }}
+{{- $key := .Values.harnessSecretName }}
+{{- if $key }}
+{{- if $hub }}
+{{- fail "harnessSecretName must be empty with agentModel hub: the hub model puts no API key on the spoke" }}
+{{- end }}
+{{- /* Where workshop/2-clusters writes it; also stops a member file reading another spoke's key. */}}
+{{- if ne $key (printf "harness-api-keys/%s" $name) }}
+{{- fail (printf "harnessSecretName %q must be harness-api-keys/%s" $key $name) }}
+{{- end }}
+{{- end }}
+{{- $pushKey := and .Values.gitopsAgent (eq .Values.agentModel "") $key }}
+{{- if or $hub $pushKey }}
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -57,6 +77,8 @@ spec:
                 cluster: {{ $name }}
                 user: argocd-manager
           current-context: {{ $name }}
+{{- end }}
+{{- if $hub }}
 ---
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
@@ -79,4 +101,85 @@ spec:
         name: {{ $name }}-kubeconfig
         namespace: {{ .Release.Namespace }}
         key: kubeconfig
+{{- end }}
+{{- if $pushKey }}
+---
+# The spoke's own controller key, from OpenBao.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $name }}-harness-api-key
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ .Values.secretStore.name }}
+  data:
+    - secretKey: api_key
+      remoteRef:
+        key: {{ $key }}
+        property: api_key
+  target:
+    name: {{ $name }}-harness-api-key
+    creationPolicy: Owner
+    # Retain: removing the store entry never empties the key on the spoke.
+    deletionPolicy: Retain
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: push-{{ $name }}-hga-system
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  conditions:
+    - namespaces: [{{ .Release.Namespace }}]
+  provider:
+    kubernetes:
+      # Where the spoke's controller reads its key.
+      remoteNamespace: hga-system
+      authRef:
+        name: {{ $name }}-kubeconfig
+        namespace: {{ .Release.Namespace }}
+        key: kubeconfig
+---
+# No secretKey or property: the whole Secret is copied, so the spoke gets key
+# api_key. deletionPolicy None: deleting this never removes the spoke's key.
+apiVersion: external-secrets.io/v1alpha1
+kind: PushSecret
+metadata:
+  name: {{ $name }}-harness-api-key
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  refreshInterval: {{ .Values.refreshInterval }}
+  updatePolicy: Replace
+  deletionPolicy: None
+  secretStoreRefs:
+    - name: push-{{ $name }}-hga-system
+      kind: ClusterSecretStore
+  selector:
+    secret:
+      name: {{ $name }}-harness-api-key
+  data:
+    - match:
+        remoteRef:
+          remoteKey: harness-api-key-secret
+{{- end }}
 {{- end }}

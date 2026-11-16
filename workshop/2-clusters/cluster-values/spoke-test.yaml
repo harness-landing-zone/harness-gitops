@@ -1,0 +1,6 @@
+# A spoke that runs its own controller: workspace spoke-test, k3d cluster
+# hga-spoke-test, its own Harness key in OpenBao at harness-api-keys/spoke-test.
+role: spoke
+# The BU's Harness org. Its role hga_controller_<bu> comes from
+# ../1-harness-setup.
+bu: bu1

@@ -2,13 +2,15 @@
 # Local test clusters: a hub and spokes on one Docker network, so the hub can
 # reach a spoke's API at https://k3d-hga-<spoke>-server-0:6443. A spoke's name
 # is its fleet-member name (spoke-<x>); its k3d cluster is hga-<spoke> and its
-# context k3d-hga-<spoke>. Your current context is left alone. up makes the
-# spokes in envs (below); OpenTofu (var.spokes in ../spoke-keys.tf) makes the
-# others with spoke and store-key.
+# context k3d-hga-<spoke>. Your current context is left alone. Normally run by
+# OpenTofu in this folder (one workspace per cluster, see README.md); every
+# command also works by hand.
 #
-#   k3d.sh up                create the hub and hga-spoke-<env> for each env if
-#                            missing (an existing cluster is untouched), then pin
+#   k3d.sh hub               create hga-hub if missing, pin it
+#   k3d.sh delegate <name>   install the Harness delegate <name> on the hub
+#                            ($DELEGATE_TOKEN, $HARNESS_ACCOUNT_ID)
 #   k3d.sh pin [cluster...]  fix each container's current address on network hga
+#                            (no cluster: every hga-* cluster)
 #   k3d.sh register          write every hga-spoke-* cluster's connection into
 #                            OpenBao on the hub (clusters/spoke-<x>)
 #   k3d.sh spoke <name>      create hga-<name> if missing, pin it, register it
@@ -40,6 +42,11 @@ pin() {
       echo "pinned $n at $ip"
     done
   done
+}
+
+# Prints the k3d clusters whose names start with $1.
+k3d_clusters() {
+  k3d cluster list -o json | jq -r --arg p "$1" '.[].name | select(startswith($p))'
 }
 
 # Creates k3d cluster $1 unless it exists, and merges its context.
@@ -115,27 +122,40 @@ spoke_name() {
     { echo "$0: '${1:-}' is not spoke-<name> (a DNS label)" >&2; exit 2; }
 }
 
-envs=(nonprod prod)
-clusters=(hga-hub "${envs[@]/#/hga-spoke-}")
 hub=k3d-hga-hub
 
 case "${1:-}" in
-  up)
-    for c in "${clusters[@]}"; do
-      create_cluster "$c"
-    done
-    pin "${clusters[@]}"
+  hub)
+    create_cluster hga-hub
+    pin hga-hub
+    ;;
+  delegate)
+    [ -n "${2:-}" ] || { echo "usage: $0 delegate <name>" >&2; exit 2; }
+    [ -n "${DELEGATE_TOKEN:-}" ] && [ -n "${HARNESS_ACCOUNT_ID:-}" ] ||
+      { echo "$0: DELEGATE_TOKEN and HARNESS_ACCOUNT_ID must be set" >&2; exit 1; }
+    helm repo add harness-delegate \
+      https://app.harness.io/storage/harness-download/delegate-helm-chart/ --force-update >/dev/null
+    # The token only as values on stdin (-f -), never on a command line.
+    jq -n '{delegateToken: env.DELEGATE_TOKEN}' |
+      helm upgrade -i "$2" harness-delegate/harness-delegate-ng \
+        --kube-context "$hub" -n harness-delegate-ng --create-namespace \
+        --set delegateName="$2" \
+        --set accountId="$HARNESS_ACCOUNT_ID" \
+        --set managerEndpoint=https://app.harness.io \
+        --set upgrader.enabled=true \
+        -f - >/dev/null
+    echo "installed delegate $2 on $hub"
     ;;
   pin)
     shift
-    [ $# -gt 0 ] || set -- "${clusters[@]}"
+    [ $# -gt 0 ] || set -- $(k3d_clusters hga-)
     pin "$@"
     ;;
   register)
     # Every hga-spoke-* cluster, also those OpenTofu made. Re-run after a hub
     # restart (dev mode empties the store) or a spoke rebuild. Controller keys
-    # are not restored here: see ../spoke-keys.tf.
-    for c in $(k3d cluster list -o json | jq -r '.[].name | select(startswith("hga-spoke-"))'); do
+    # are not restored here: see README.md.
+    for c in $(k3d_clusters hga-spoke-); do
       register_spoke "${c#hga-}"
     done
     ;;
@@ -154,13 +174,12 @@ case "${1:-}" in
     ;;
   down)
     shift
-    [ $# -gt 0 ] ||
-      set -- $(k3d cluster list -o json | jq -r '.[].name | select(startswith("hga-")) | ltrimstr("hga-")')
+    if [ $# -gt 0 ]; then set -- "${@/#/hga-}"; else set -- $(k3d_clusters hga-); fi
     [ $# -gt 0 ] || { echo "no hga-* clusters"; exit 0; }
-    k3d cluster delete "${@/#/hga-}"
+    k3d cluster delete "$@"
     ;;
   *)
-    echo "usage: $0 up|pin [cluster...]|register|spoke <name>|store-key <name>|down [name...]" >&2
+    echo "usage: $0 hub|delegate <name>|pin [cluster...]|register|spoke <name>|store-key <name>|down [name...]" >&2
     exit 2
     ;;
 esac
