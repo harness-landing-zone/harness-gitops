@@ -1,3 +1,14 @@
+# This chart has two parts: the store (installed once, on the hub) and one
+# ExternalSecret per member cluster.
+#
+# The ClusterSecretStore (plus its dev token Secret). The ExternalSecret reads
+# from the store of this name. Rendered only on the hub's one store release.
+secretStore:
+  enabled: false
+  name: hub-openbao
+# One per member. bootstrap/cluster-registration.yaml turns it on.
+externalSecret:
+  enabled: false
 # The Argo CD cluster name and the cluster Secret name. Set by bootstrap/ from
 # the member folder name; also the OpenBao key clusters/<clusterName>.
 clusterName: ""
@@ -12,9 +23,5 @@ gitopsAgent: false
 # Annotations for the cluster Secret. Set by bootstrap/: repo_url and
 # harness_account_id, copied from the hub cluster Secret.
 annotations: {}
-# The External Secrets store that holds the cluster connections.
-store:
-  kind: ClusterSecretStore
-  name: hub-openbao
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m

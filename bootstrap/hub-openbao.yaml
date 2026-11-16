@@ -15,8 +15,10 @@
 # that part of the sync retries.
 #
 # Values: addons/hub/defaults/openbao/values.yaml, then the optional
-# addons/hub/environments/<environment>/openbao/values.yaml. Store objects:
-# addons/hub/openbao-store/.
+# addons/hub/environments/<environment>/openbao/values.yaml. The
+# ClusterSecretStore hub-openbao and its dev token Secret come from
+# charts/cluster-registration (release openbao-store, store on), as Fleet
+# Management's fleet-secret chart carries its store.
 #
 # No metadata.namespace: the root Application applies this into the hub
 # agent's namespace.
@@ -58,10 +60,18 @@ spec:
             valueFiles:
               - '$values/addons/hub/defaults/openbao/values.yaml'
               - '$values/addons/hub/environments/{{ .metadata.labels.environment }}/openbao/values.yaml'
-        # The dev root token Secret and the ClusterSecretStore.
+        # The ClusterSecretStore and its dev token Secret, from the
+        # registration chart (store on, no member ExternalSecret).
         - repoURL: '{{ .metadata.annotations.repo_url }}'
           targetRevision: HEAD
-          path: addons/hub/openbao-store
+          path: charts/cluster-registration
+          helm:
+            releaseName: openbao-store
+            valuesObject:
+              secretStore:
+                enabled: true
+              externalSecret:
+                enabled: false
       syncPolicy:
         automated:
           selfHeal: true

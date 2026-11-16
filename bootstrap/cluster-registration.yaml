@@ -65,10 +65,13 @@ spec:
             valuesObject:
               clusterName: '{{ .path.basename }}'
               tenant: '{{ index .path.segments 1 }}'
-              # The only store allowed to hold cluster connections.
-              store:
-                kind: ClusterSecretStore
+              # Every member: only its ExternalSecret. The store is
+              # installed once, by the hub's openbao Application.
+              secretStore:
+                enabled: false
                 name: hub-openbao
+              externalSecret:
+                enabled: true
               annotations:
                 repo_url: '{{ .metadata.annotations.repo_url }}'
                 harness_account_id: '{{ .metadata.annotations.harness_account_id }}'
