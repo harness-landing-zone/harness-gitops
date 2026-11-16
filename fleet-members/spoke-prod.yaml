@@ -13,4 +13,4 @@ stage: prod
 gitopsAgent: true
 # Where the agent's controller runs: "" = on this cluster (v1); hub = only the
 # hub's controller, the token pushed by ESO (label agent_model: hub).
-agentModel: ""
+agentModel: "hub"
