@@ -115,7 +115,9 @@ Today's model:
 External Secrets builds the Argo CD cluster Secret from the store and the
 file. Its labels make three Applications for the spoke: `<cluster>-controller`,
 `<cluster>-runtime` and `<cluster>-teams`. The spoke's controller registers
-the agent under the tenant's org, and the agent connects.
+the agent under the tenant's org, and the agent connects. Every Application of
+a cluster carries the label `cluster`, so the filter `cluster:<name>` in the
+Harness GitOps list shows them together.
 
 With `agentModel: hub`, step 2 disappears. See the architecture document for
 what that model installs where, and for what is not proven.

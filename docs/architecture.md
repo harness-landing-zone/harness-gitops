@@ -1,7 +1,8 @@
 # Architecture: what is built, how it runs, what is not proven
 
 This document describes the repository at commit `4d7badc` (branch `main`,
-2026-11-16). Anything changed after that commit is not covered.
+2026-11-16). Anything changed after that commit is not covered, with one
+exception: the Application names and labels are those of commit `9de762e`.
 
 It is written for a reader with no context, and for reviewers looking for
 gaps. Every statement about the build carries one of four marks:
@@ -153,13 +154,18 @@ After step 12 the hub waits for member files.
 | 2 | Script | `local/k3d.sh register` creates ServiceAccount `argocd-manager` with cluster-admin on the spoke and writes the spoke's connection into the store at `clusters/<cluster>`. The script knows only the two test spokes (`spoke-nonprod`, `spoke-prod`); any other cluster needs its entry written another way. | Spoke, hub |
 | 3 | **A person, by hand** | Creates namespace `hga-system` and Secret `harness-api-key-secret` on the spoke from the tenant's API key. Never in git. | Spoke |
 | 4 | A person | Commits `fleet-members/<cluster>.yaml` with `tenant`, `stage`, `gitopsAgent: true` and `agentModel: ""`. | Git |
-| 5 | Hub Argo CD | `cluster-registration` makes Application `register-<cluster>`: one ExternalSecret in `hga-hub-agent`. | Hub |
+| 5 | Hub Argo CD | `cluster-registration` makes Application `<cluster>-cluster`: one ExternalSecret in `hga-hub-agent`. | Hub |
 | 6 | ESO | Builds the cluster Secret `<cluster>`: the connection from the store, labels `fleet_member: spoke`, `tenant`, `stage` from the member file, annotations copied from the hub. | Hub |
 | 7 | Hub Argo CD | The labels make three Applications for the spoke: `<cluster>-controller`, `<cluster>-runtime`, `<cluster>-teams`. | Hub to spoke |
 | 8 | Hub Argo CD | `<cluster>-controller` installs the controller and its CRDs into `hga-system`. | Spoke |
 | 9 | Hub Argo CD | `<cluster>-runtime`, into namespace `<cluster>`: Argo CD with its CRDs, then the agent object and a locked `default` AppProject, then the agent pod. | Spoke |
 | 10 | Spoke's controller | Registers the agent in Harness under org `<tenant>` at ORG scope, and writes `<cluster>-agent-token`. The agent pod starts and connects. | Spoke, Harness |
 | 11 | Hub Argo CD | `<cluster>-teams`: for each team file, the team's namespaces, its AppProject and its mapping. The controller marks the mapping Ready once the agent is healthy. | Spoke |
+
+Every Application of a cluster is named `<cluster>-<part>` and carries the
+labels `cluster`, `tenant` and `stage`. In the Harness GitOps list a cluster's
+Applications therefore sort together, and the label filter `cluster:<name>`
+returns all of them. [live]
 
 What is live and what is not:
 
@@ -181,8 +187,8 @@ The member file says `agentModel: hub`. That adds the label
 | Step | What differs from today's model |
 |---|---|
 | Step 3 | Gone. No API key and no controller on the spoke. `spoke-controller` skips the cluster. |
-| Step 5 | `register-<cluster>` also renders a second ExternalSecret, `<cluster>-kubeconfig`, built from the same store entry, and a `ClusterSecretStore` `push-<cluster>` that lets ESO write into namespace `<cluster>` on the spoke. Only the hub namespace `<cluster>` may use that store. |
-| New, on the hub | `agent-registration` makes Application `<cluster>-registration` in hub namespace `<cluster>`: the agent object (using `harness-api-key-<tenant>` from the hub's `hga-system`), a `PushSecret`, and per team a mapping with a placeholder AppProject. |
+| Step 5 | `<cluster>-cluster` also renders a second ExternalSecret, `<cluster>-kubeconfig`, built from the same store entry, and a `ClusterSecretStore` `push-<cluster>` that lets ESO write into namespace `<cluster>` on the spoke. Only the hub namespace `<cluster>` may use that store. |
+| New, on the hub | `agent-registration` makes Application `<cluster>-agent` in hub namespace `<cluster>`: the agent object (using `harness-api-key-<tenant>` from the hub's `hga-system`), a `PushSecret`, and per team a mapping with a placeholder AppProject. |
 | Hub's controller | Registers the agent and writes `<cluster>-agent-token` on the hub. |
 | ESO | The `PushSecret` copies that Secret to the same name and namespace on the spoke. |
 | Step 9 | `<cluster>-runtime` installs Argo CD, the locked `default` AppProject and the agent pod, but no agent object. The pod starts once the pushed token arrives. |
