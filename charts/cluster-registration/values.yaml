@@ -33,7 +33,8 @@ refreshInterval: 1m
 agentModel: ""
 # From the member file. Self-managed spokes (agentModel "") only: the OpenBao
 # path of this spoke's own controller key (property api_key), written by
-# workshop/2-clusters; must be harness-api-keys/<clusterName>. Set = the hub
+# workshop/2-clusters (its cluster-values harnessSecretName, the same value);
+# must be under harness-api-keys/. Set = the hub
 # pushes it to the spoke as hga-system/harness-api-key-secret
 # (templates/push.yaml); empty = that Secret is created by hand.
 harnessSecretName: ""

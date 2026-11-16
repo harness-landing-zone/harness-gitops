@@ -21,9 +21,9 @@ stays in the store and out of git.
 {{- if $hub }}
 {{- fail "harnessSecretName must be empty with agentModel hub: the hub model puts no API key on the spoke" }}
 {{- end }}
-{{- /* Where workshop/2-clusters writes it; also stops a member file reading another spoke's key. */}}
-{{- if ne $key (printf "harness-api-keys/%s" $name) }}
-{{- fail (printf "harnessSecretName %q must be harness-api-keys/%s" $key $name) }}
+{{- /* Under harness-api-keys/, where workshop/2-clusters writes keys: never a cluster connection (clusters/). Which key a spoke gets is reviewed in its member file. */}}
+{{- if not (regexMatch "^harness-api-keys/[a-z0-9]([-a-z0-9_/]*[a-z0-9])?$" $key) }}
+{{- fail (printf "harnessSecretName %q must be harness-api-keys/<name>" $key) }}
 {{- end }}
 {{- end }}
 {{- $pushKey := and .Values.gitopsAgent (eq .Values.agentModel "") $key }}

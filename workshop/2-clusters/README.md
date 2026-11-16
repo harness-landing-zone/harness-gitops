@@ -9,7 +9,10 @@ Harness side.
   `../1-harness-setup`).
 - **spoke-&lt;name&gt;**: k3d cluster `hga-spoke-<name>`, its connection in OpenBao
   on the hub (`clusters/<name>`), and its own Harness API key, scoped to its
-  business unit's org, in OpenBao at `harness-api-keys/<name>`.
+  business unit's org, in OpenBao at its `harnessSecretName` (default
+  `harness-api-keys/<name>`; `tofu output harness_secret_name` shows it). The
+  member file `fleet-members/<name>.yaml` names the same path, and the hub
+  pushes the key to the spoke.
 
 ## What you need first
 

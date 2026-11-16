@@ -12,6 +12,9 @@ locals {
   script   = abspath("${path.module}/k3d.sh")
   # The spoke's own Harness identity.
   id = "hga_agent_${replace(local.name, "-", "_")}"
+  # Where the spoke's key goes in OpenBao (the AWS Secrets Manager secret name
+  # on EKS). The member file's harnessSecretName must name the same path.
+  secret = coalesce(try(local.values.harnessSecretName, null), "harness-api-keys/${local.name}")
 }
 
 # The values file, checked before anything runs. Names reach k3d, Helm and the
@@ -37,6 +40,12 @@ resource "terraform_data" "values" {
     precondition {
       condition     = local.role != "spoke" || local.bu != ""
       error_message = "cluster-values/${local.name}.yaml: a spoke needs bu."
+    }
+    # Under harness-api-keys/ only: a key must never overwrite a cluster
+    # connection (clusters/<name>).
+    precondition {
+      condition     = local.role != "spoke" || can(regex("^harness-api-keys/[a-z0-9]([-a-z0-9_/]*[a-z0-9])?$", local.secret))
+      error_message = "cluster-values/${local.name}.yaml: harnessSecretName must be harness-api-keys/<name> (lowercase letters, digits, -, _, /)."
     }
   }
 }
@@ -165,20 +174,25 @@ resource "terraform_data" "spoke_cluster" {
 }
 
 # The local stand-in for aws_secretsmanager_secret_version: the key in OpenBao
-# at harness-api-keys/<name>, property api_key. It reaches the script only
-# through its environment, and a new token is stored again. Dev-mode OpenBao
-# forgets it on a hub restart; store it again with
+# at harnessSecretName (local.secret), property api_key. It reaches the script
+# only through its environment; a new token or a new path stores it again.
+# Dev-mode OpenBao forgets it on a hub restart; store it again with
 # tofu apply -replace='terraform_data.spoke_key[0]'.
 resource "terraform_data" "spoke_key" {
   count            = local.role == "spoke" ? 1 : 0
-  triggers_replace = harness_platform_token.spoke_agent[0].value
+  triggers_replace = [harness_platform_token.spoke_agent[0].value, local.secret]
 
   provisioner "local-exec" {
-    command = "\"${local.script}\" store-key ${local.name}"
+    command = "\"${local.script}\" store-key ${local.secret}"
     environment = {
       HARNESS_API_KEY = harness_platform_token.spoke_agent[0].value
     }
   }
 
   depends_on = [terraform_data.spoke_cluster]
+}
+
+# The value for harnessSecretName in fleet-members/<name>.yaml.
+output "harness_secret_name" {
+  value = local.role == "spoke" ? local.secret : null
 }
