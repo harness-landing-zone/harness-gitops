@@ -1,65 +1,26 @@
 {{- /*
-Every AppProject, from one block: one per appProjects entry (only description,
-sourceRepos and destinations are read; the rest is forced) plus a locked
-default. Wave 1: after Argo CD's CRDs (wave 0), which may arrive in the same
-sync, hence also SkipDryRunOnMissingResource.
+The agent's locked default AppProject: Argo CD always has one, and it must
+allow nothing. The teams' AppProjects come from charts/teams-bootstrap.
+Wave 1: after Argo CD's CRDs (wave 0), which may arrive in the same sync,
+hence also SkipDryRunOnMissingResource.
 */}}
-{{- $projects := list }}
-{{- range $name, $p := .Values.appProjects }}
-{{- if eq $name "default" }}
-{{- fail "appProjects: \"default\" is reserved, it is the locked AppProject" }}
-{{- end }}
-{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name) }}
-{{- fail (printf "appProjects: %q must be lowercase letters, digits and dashes" $name) }}
-{{- end }}
-{{- range $other, $_ := $.Values.appProjects }}
-{{- if hasPrefix (printf "%s-" $other) $name }}
-{{- fail (printf "appProjects: %q is %q plus a dash, so its namespaces would match both" $name $other) }}
-{{- end }}
-{{- end }}
-{{- range (default list $p.sourceRepos) }}
-{{- if or (contains "*" .) (contains "?" .) (contains "[" .) (hasPrefix "!" .) }}
-{{- fail (printf "appProjects.%s.sourceRepos: %q is a pattern; list exact repository URLs" $name .) }}
-{{- end }}
-{{- end }}
-{{- $destinations := list }}
-{{- range (default list $p.destinations) }}
-{{- $server := default "https://kubernetes.default.svc" .server }}
-{{- if ne $server "https://kubernetes.default.svc" }}
-{{- fail (printf "appProjects.%s.destinations: server %q; teams deploy to this cluster only" $name $server) }}
-{{- end }}
-{{- /* The team's own prefix keeps it off kube-*, this Argo CD's namespace
-and other teams' namespaces. */}}
-{{- if not (hasPrefix (printf "%s-" $name) (default "" .namespace)) }}
-{{- fail (printf "appProjects.%s.destinations: namespace %q must start with %q" $name .namespace (printf "%s-" $name)) }}
-{{- end }}
-{{- $destinations = append $destinations (dict "server" $server "namespace" .namespace) }}
-{{- end }}
-{{- $projects = append $projects (dict "name" $name "description" (default (printf "Team %s" $name) $p.description) "sourceRepos" (default list $p.sourceRepos) "destinations" $destinations) }}
-{{- end }}
-{{- $projects = append $projects (dict "name" "default" "description" "Deny-all. Use the team projects instead.") }}
-{{- range $projects }}
----
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: {{ .name | quote }}
-  namespace: {{ $.Release.Namespace }}
+  name: default
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: {{ $.Chart.Name }}
-    app.kubernetes.io/instance: {{ $.Release.Name }}
-    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  description: {{ .description | quote }}
-  sourceRepos: {{ toYaml (default list .sourceRepos) | nindent 4 }}
-  destinations: {{ toYaml (default list .destinations) | nindent 4 }}
+  description: Deny-all. Use the team projects instead.
+  sourceRepos: []
+  destinations: []
   clusterResourceWhitelist: []
-  {{- /* The controller acts on agent objects in any namespace it can see;
-  no team may create one. */}}
   namespaceResourceBlacklist:
     - group: gitops.harness.io
       kind: "*"
-{{- end }}

@@ -2,8 +2,8 @@ apiVersion: v2
 name: agent-registration
 description: >-
   A GitOps agent's Harness side on the cluster it runs on: the
-  HarnessGitopsAgent, one project mapping per team, the team AppProjects and a
-  locked default. The controller on the same cluster registers the agent and
-  writes its token beside it for the runtime (charts/gitops-agent).
+  HarnessGitopsAgent and a locked default AppProject. The controller on the
+  same cluster registers the agent and writes its token beside it for the
+  runtime (charts/gitops-agent). The teams are charts/teams-bootstrap.
 type: application
 version: 0.2.0

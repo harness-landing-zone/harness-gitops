@@ -1,0 +1,9 @@
+apiVersion: v2
+name: teams-bootstrap
+description: >-
+  The teams of one GitOps agent, on the cluster the agent runs on: per team its
+  namespaces, the AppProject that fences it and its Harness project mapping.
+  Separate from the agent (charts/fleet-member-registration), so teams change
+  on their own lifecycle.
+type: application
+version: 0.1.0

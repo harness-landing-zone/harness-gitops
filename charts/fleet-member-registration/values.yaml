@@ -1,6 +1,7 @@
-# Same keys as charts/gitops-agent (gitopsAgent.*), so one values file feeds
-# this chart and the runtime. Everything renders into the release namespace,
-# beside the controller that registers it.
+# The agent's Harness side: the HarnessGitopsAgent and the locked default
+# AppProject, in the agent's namespace beside the controller that registers it.
+# Same keys as charts/gitops-agent (gitopsAgent.*). The teams are
+# charts/teams-bootstrap.
 
 gitopsAgent:
   harnessAgent:
@@ -23,27 +24,9 @@ gitopsAgent:
   agent:
     existingSecrets:
       agentToken: ""
-  # One per team: the team's AppProject (an appProjects entry below) and the
-  # Harness project in the agent's org it maps to.
-  #   - name: team-a
-  #     appProject: team-a
-  #     projectId: team_a
-  projectMappings: []
   harness:
     identity:
       accountIdentifier: ""
       orgIdentifier: ""
       projectIdentifier: ""
       agentIdentifier: ""
-
-# One entry per team, keyed by the AppProject name (one file per team, merged).
-# Only these keys are read; the rest is forced: no cluster-scoped resources,
-# no gitops.harness.io objects.
-#   team-a:
-#     description: Team a
-#     sourceRepos:             # exact URLs, no patterns
-#       - https://github.com/example/team-a.git
-#     destinations:            # this cluster only; namespace starts "team-a-"
-#       - server: https://kubernetes.default.svc
-#         namespace: team-a-*
-appProjects: {}

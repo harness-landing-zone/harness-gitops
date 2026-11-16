@@ -1,0 +1,18 @@
+# Required, set by bootstrap/: the HarnessGitopsAgent (in this namespace) every
+# mapping points at.
+agentName: ""
+
+# One entry per team, keyed by the team name (one file per team, merged). The
+# name is the AppProject, the mapping and the prefix of every namespace.
+#   team-a:
+#     projectId: team_a          # required: Harness project in the agent's org
+#     description: Team a
+#     sourceRepos:               # exact URLs, no patterns
+#       - https://github.com/example/team-a.git
+#     namespaces: [team-a-dev]   # created by the platform; start "team-a-"
+#     destinations:              # this cluster only; namespace starts "team-a-"
+#       - server: https://kubernetes.default.svc
+#         namespace: team-a-*
+# Nothing else is read: no cluster-scoped resources, no gitops.harness.io
+# objects, mapping fields fixed.
+teams: {}
