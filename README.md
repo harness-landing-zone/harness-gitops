@@ -1,229 +1,164 @@
 # Harness GitOps Agents reference architecture
 
-A reference architecture for running Harness GitOps Agents at scale with the
-official HGA controller (`harness/gitops-agent-bootstrap-controller`). The
-headline: **onboarding a business unit is one values file.**
+A reference architecture for running Harness GitOps Agents on many clusters
+with the official HGA controller (`harness/gitops-agent-bootstrap-controller`),
+modelled on EKS Fleet Management.
 
-A hub cluster holds the controller and every Harness key. Each spoke cluster
-runs its own Argo CD and GitOps agent for one tenant (a business unit, one
-Harness org) and stage; each team is one Harness project, mapped to one AppProject on
-the spoke. The hub registers the spoke agents and keeps them reconciled;
-developers create Applications on their team's project, and the workloads land
-only in the namespaces the business unit lists.
+One account-level agent on a **hub** cluster deploys an agent onto every
+**spoke** cluster, from files in this repo. Adding a cluster is one member
+file. Adding a team is one team file.
+
+**[docs/architecture.md](docs/architecture.md) is the full description**: who
+holds what, every step from an empty machine, what has run and what has not,
+and the open questions. This README is the short version.
+
+## Status
+
+Everything here has run only on three local k3d clusters (one hub, two
+spokes). Two models exist for a spoke's agent:
+
+| Model | Member file | Where the controller and the Harness API key are | State |
+|---|---|---|---|
+| Today's model (v1) | `agentModel: ""` | On the hub and on every spoke. The spoke's key Secret is created by hand. | Running on both spokes |
+| Hub model | `agentModel: hub` | On the hub only. External Secrets pushes the agent's own token to the spoke. | Built, never run |
+
+The hub model is the intended one: Harness API access belongs to the hub, and
+a spoke only does GitOps.
 
 ```mermaid
 flowchart LR
-  platform["Platform repo"] --> hub
+  git["This repo"] --> hubargo
   subgraph hub["Hub cluster"]
-    ctrl["HGA controller + keys<br/>hga-system"]
-    hubagent["Account agent + Argo CD<br/>hga-hub-agent"]
-    reg["Per spoke: agent object,<br/>mappings, shadow AppProjects<br/>namespace spoke-&lt;stage&gt;"]
+    ctrl["Controller + API keys<br/>hga-system"]
+    hubargo["Hub agent + Argo CD<br/>hga-hub-agent"]
+    eso["External Secrets + OpenBao<br/>cluster connections"]
   end
-  subgraph spoke["Spoke cluster, one per tenant and stage"]
-    rt["Argo CD + agent<br/>namespace spoke-&lt;stage&gt;"]
-    work["Team namespaces"]
+  subgraph spoke["Spoke cluster"]
+    sctrl["Controller + API key<br/>today's model only"]
+    rt["Argo CD + agent<br/>namespace = cluster name"]
+    teams["Team namespaces<br/>and AppProjects"]
   end
-  hubagent -- "agent-registration" --> reg
-  hubagent -- "spoke-runtime" --> rt
-  reg -. "token, carried" .-> rt
-  rt --> work
-  ctrl -. registers .-> harness
-  subgraph harness["Harness"]
-    admin["gitops_admin project"]
-    teams["BU org, one project per team"]
-  end
-  hubagent -. mapped to .-> admin
-  rt -. mapped to .-> teams
+  eso -- "cluster Secret<br/>with labels" --> hubargo
+  hubargo -- "installs" --> sctrl
+  hubargo -- "installs" --> rt
+  hubargo -- "installs" --> teams
+  ctrl -. "registers hub agent" .-> harness["Harness"]
+  sctrl -. "registers spoke agent" .-> harness
+  rt -. "connects with its own token" .-> harness
 ```
-
-## How it works
-
-1. **Bootstrap the hub.** The Harness pipeline `hga_hub_bootstrap` installs two
-   Helm charts with Native Helm: the HGA controller into `hga-system`, then the
-   ACCOUNT-scoped agent into `hga-hub-agent` (`charts/gitops-agent`), which
-   also creates the API-key Secrets in `hga-system` (the hub's own and one per
-   business unit), the bundled Argo CD, the repo credential, the hub cluster
-   Secret and the root ApplicationSet, which syncs `bootstrap/` flat.
-2. **Point it at an environment.** The Harness Environment chosen when the
-   pipeline runs is stamped on the hub cluster Secret:
-
-   | Key | Kind | Value |
-   |---|---|---|
-   | `fleet_member` | label | `hub-cluster` |
-   | `environment` | label | Harness environment identifier |
-   | `harness_env_ref` | label | same identifier; becomes `harness.io/envRef` on Applications |
-   | `repo_url` | annotation | this repo |
-   | `harness_account_id` | annotation | account id, injected into every spoke agent |
-
-3. **Register a spoke.** A cluster Secret for the spoke in `hga-hub-agent`,
-   labelled `fleet_member: spoke`, `tenant: <tenant>` and `stage: <stage>`.
-   Its name (`spoke-<stage>`) becomes the agent's name,
-   identifier (`spoke_<stage>`) and namespace on both clusters, so never rename
-   it. Locally, `local/k3d.sh register` writes these Secrets.
-4. **Two ApplicationSets do the rest**, both reading
-   `tenants/<tenant>/<stage>/spokes.yaml` for each labelled spoke:
-   - `bootstrap/agent-registration.yaml` makes `spoke-<stage>-registration` on
-     the hub, namespace `spoke-<stage>` (`charts/agent-registration`): the
-     ORG-scoped agent object using the business unit's key, one project
-     mapping per team and deny-all shadow AppProjects. The controller
-     registers the agent and writes its token there.
-   - `bootstrap/spoke-runtime.yaml` (ApplicationSet `spoke-runtime`) makes
-     `spoke-<stage>-runtime` on the spoke, namespace `spoke-<stage>`: a cluster-wide Argo CD and the agent
-     (`charts/gitops-agent` with the agent object off), plus the team
-     namespaces and the real AppProjects (`charts/agent-registration` with
-     `spoke: true`).
-5. **Carry the token.** The agent's token Secret is copied from the hub to the
-   spoke (`local/carry-token.sh <stage> spoke-<stage>-agent-token` until External
-   Secrets replaces it). The agent then connects on its own.
-
-One hub per environment. The hub agent's identity is derived from the
-environment identifier (`hga_<env>_hub`), so environment identifiers must be
-lowercase letters and digits only.
 
 ## Layout
 
 ```
-harness-gitops/
-├── charts/        harness-gitops-agent-controller, gitops-agent,
-│                  agent-registration, org-platform (parked)
-├── hub/           day-0 values: controller.yaml, account-agent.yaml
-├── bootstrap/     agent-registration.yaml, spoke-runtime.yaml
-│                  (read flat by the root Application)
-├── tenants/<tenant>/<stage>/spokes.yaml   one tenant's teams on its spokes
-├── workshop/1-harness-setup/   OpenTofu for every Harness entity, including
-│                               business units, their projects and keys
-└── examples/org/  the parked org-shard pattern
+bootstrap/          applied by the hub's root Application: ESO, OpenBao,
+                    cluster registration, agent registration (hub model), spokes
+spoke-bootstrap/    ApplicationSets that install on spokes: controller (v1 only),
+                    runtime, teams
+fleet-members/      one file per spoke: tenant, stage, gitopsAgent, agentModel
+tenants/<tenant>/gitops-agents/
+                    defaults, per-stage values, and one file per team
+charts/             the official controller chart, gitops-agent (wraps the
+                    official gitops-helm), cluster-registration,
+                    fleet-member-registration, teams-bootstrap
+hub/                values for the Day 0 pipeline
+addons/hub/         values for the hub's add-ons
+workshop/1-harness-setup/   OpenTofu for every Harness entity, and the pipeline
+docs/               the architecture document
 ```
 
-Both official charts are vendored copies of the published releases
-(github.com/harness/gitops-helm/releases): `harness-gitops-agent-controller`
-0.1.0 verbatim, and `gitops-helm` 1.2.12 as the released tarball inside
-`charts/gitops-agent`. That chart adds four optional hub templates on top
-(API-key Secrets, repo credential, hub cluster Secret, root ApplicationSet),
-turns the Harness plugin sidecar off, and nests every gitops-helm value under
-`gitopsAgent:`. `agent-registration` and `org-platform` are ours. Switching to
-Harness's remote chart repository is planned once its index lists these
-versions.
+Only files under `hub/` may use Harness expressions. Everything else is
+rendered by Argo CD, which cannot resolve them.
 
-Only files under `hub/` may use Harness expressions. Files under `tenants/`
-are plain Helm values, because Argo CD cannot resolve them.
+## From zero to a hub
 
-## Prerequisites
+1. Create the Harness entities: `tofu apply` in
+   [workshop/1-harness-setup/](workshop/1-harness-setup/README.md). It needs a
+   Harness account, a personal access token and a GitHub App installed on
+   this repo.
+2. Have a cluster for the hub with a Harness delegate in it. The OpenTofu
+   module prints the install command.
+3. Push this repo to `main`. The pipeline fetches charts and values from there.
+4. Run pipeline `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`.
+   It installs the controller into `hga-system`, then the hub agent with its
+   Argo CD into `hga-hub-agent`.
+5. The hub's Argo CD then applies `bootstrap/` by itself: External Secrets
+   Operator, OpenBao with its store, and the ApplicationSets that register
+   and bootstrap spokes.
 
-- A Kubernetes cluster with a Harness delegate running in it.
-- Kubernetes connector `hga_test_hub`, set to inherit credentials from the
-  delegate.
-- Secrets `HGA-Token`, the hub's API key (account scope; the controller uses
-  it for the hub agent), `hga_controller_<bu>_token` per business unit (an
-  org-scoped key for that BU's spoke agents), and
-  `hga_github_app`, a single-line JSON with string ids and a base64 private key:
-  `{"githubAppID":"...","githubAppInstallationID":"...","githubAppPrivateKeyB64":"..."}`
-- The GitHub App installed on this repo.
-- Connector `hga_github` (GitHub App, on the org that holds this repo). No
-  registry connector is needed: the controller image is public.
-- The entities under `workshop/1-harness-setup/harness/` created in the project (org
-  `gitops_reference`, project `gitops_admin`).
+Check:
 
-`workshop/1-harness-setup/` creates all of the above except the
-cluster and its delegate, with one `tofu apply`.
+```bash
+kubectl -n hga-hub-agent get applications,applicationsets
+```
 
-## Bootstrap a hub
+The hub agent shows CONNECTED and HEALTHY in Harness.
 
-Run `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`, which fills
-in:
+## Add a cluster with an agent
 
-- environment `test`, and both infrastructures (`hga_system`, `account_agent`);
-- `image_tag`: a `harness/gitops-agent-bootstrap-controller` tag (`v0.1.0`);
-- `deploy_agent`: `true`.
+Today's model:
 
-The charts and `hub/*.yaml` are fetched from branch `main`, so push first. The
-verify step runs on the delegate the Kubernetes connector selects.
+1. Write the cluster's connection into the store at `clusters/<cluster>`
+   (keys `server`, `caData`, `token`). On the test setup `local/k3d.sh
+   register` does this, but only for the two test spokes (`spoke-nonprod`,
+   `spoke-prod`).
+2. By hand, on the spoke: create namespace `hga-system` and Secret
+   `harness-api-key-secret` from the tenant's API key.
+3. Commit `fleet-members/<cluster>.yaml`:
 
-Verify:
+   ```yaml
+   tenant: bu1        # the Harness org
+   stage: nonprod     # which values and teams it gets
+   gitopsAgent: true  # install an agent
+   agentModel: ""     # "" = controller on the spoke, hub = hub model
+   ```
 
-- The agent `hga_test_hub` shows CONNECTED and HEALTHY in Harness.
-- `kubectl -n hga-hub-agent get applications,applicationsets`
+External Secrets builds the Argo CD cluster Secret from the store and the
+file. Its labels make three Applications for the spoke: `<cluster>-controller`,
+`<cluster>-runtime` and `<cluster>-teams`. The spoke's controller registers
+the agent under the tenant's org, and the agent connects.
 
-## Onboard a business unit
+With `agentModel: hub`, step 2 disappears. See the architecture document for
+what that model installs where, and for what is not proven.
 
-1. Add it to `local.business_units` in
-   `workshop/1-harness-setup/business-units.tf` (org, one project per team)
-   and apply. That also creates its org-scoped key, stored as
-   `hga_controller_<bu>_token`.
-2. Add `extra.harness-api-key-<bu>` under `apiKeySecret` in
-   `hub/account-agent.yaml`, push, and run `hga_hub_bootstrap`. The key must
-   be in `hga-system` before the agents can register.
-3. Write `tenants/<tenant>/<stage>/spokes.yaml` per stage: `revision` (the
-   upgrade group), `gitopsAgent.projectMappings` (one per team),
-   `destinationNamespaces` and `sourceRepos`. Push.
-4. Register each spoke's cluster Secret with the labels above (`tenant` is
-   the business unit's identifier). Then carry each
-   agent's token to its spoke.
+## Add a team
 
-Verify: `kubectl -n hga-hub-agent get applications` shows
-`spoke-<stage>-registration` and `spoke-<stage>-runtime` Synced and Healthy,
-and the agent `spoke_<stage>` shows CONNECTED and HEALTHY under the BU's org in
-Harness, with every mapping Ready.
+1. Create the team's Harness project in the tenant's org (OpenTofu,
+   `workshop/1-harness-setup/business-units.tf`).
+2. Commit `tenants/<tenant>/gitops-agents/<stage>/teams/<team>/values.yaml`
+   with the project id, the source repos, the namespaces and the destinations.
+   `tenants/bu1/gitops-agents/nonprod/teams/team-a/values.yaml` is an example.
 
-Developers create Applications on their team's project, in their team's
-AppProject and one of the listed namespaces.
-
-## The fences on a spoke
-
-- The spoke's Argo CD is cluster-wide, so the team AppProjects are the fence:
-  each allows `sourceRepos` into `destinationNamespaces` on the spoke only,
-  no cluster-scoped objects, and no `gitops.harness.io` objects. `default` is
-  locked to deny everything.
-- `charts/agent-registration` refuses `kube-*`, `default` and the Argo CD
-  namespace as destinations, and creates the listed namespaces itself (never
-  pruned).
-- No key ever reaches a spoke: the controller and every key stay on the hub,
-  and the spoke agent connects with its own token.
-- The agent object and its mappings carry `Delete=false`: deleting one runs
-  the controller finalizer, which deregisters the agent in Harness. Offboarding
-  is a deliberate manual delete.
-
-What remains: all of a business unit's teams share its namespaces on a spoke
-(per-team confinement is not built), and the token carry is manual.
-
-## Parked: org shards on the hub
-
-The first pattern, a namespaced Argo CD and ORG agent per org on the hub
-itself (`charts/org-platform`, `examples/org/`), still renders but is not the
-path forward. `org-platform` also has a parked push mode
-(`remoteCluster: true`) for a hub instance deploying to a spoke.
+Every spoke of that tenant and stage gets the team's namespaces, its
+AppProject and its mapping to the Harness project. Namespaces must start with
+`<team>-`.
 
 ## Things that bite
 
+- A spoke's name is its member file name. It becomes the namespace, the agent
+  name and the Harness identifier, and can never change. Neither can its
+  tenant.
+- Nothing is deleted automatically. Removing a member file or a team file
+  leaves everything in place. Offboarding is manual.
+- Never delete the ExternalSecret of a live spoke: it owns the cluster Secret,
+  and with it the hub's access to the spoke.
+- No old `<cluster>-agent-token` Secret may exist where a controller is about
+  to register an agent. The controller never overwrites one.
+- OpenBao runs in dev mode and is empty after every restart. Write the cluster
+  connections again (`local/k3d.sh register`).
+- An ApplicationSet that matches nothing still reports success. Check
+  `kubectl get applications`.
 - Harness expressions in comments under `hub/` are evaluated. Never write
   expression syntax in a comment there.
-- Only the controller uses the API keys, from Secrets in `hga-system`
-  (`harness-api-key-secret` for the hub agent, `harness-api-key-<bu>` per
-  business unit). Agents never see them: each connects to Harness with its own
-  token, which the controller writes beside the agent object. Rotating a key
-  means re-running the pipeline.
-- A spoke agent's identity comes from its cluster Secret name and is
-  immutable: renaming the Secret means a new agent.
-- The official `appProject` template needs the AppProject CRD before it
-  renders, so the hub creates `default` through `rootAppSet.createProject`
-  (a hook) instead.
-- `gitopsAgent.harnessAgent.spec.tokenSecretRef` must equal
-  `gitopsAgent.agent.existingSecrets.agentToken`, or the chart refuses to render.
-- `sourceRepos` left empty means deny all: nothing syncs until it is set.
-- A second controller on one cluster collides on cluster-scoped CRDs. Spokes
-  run no controller.
-- A spoke file's `revision: HEAD` follows `main`; pin a commit or tag per
-  upgrade group, nonprod first.
-- An ApplicationSet that matches nothing still reports success. Check
-  `kubectl get applications`, not ApplicationSet status.
-- Update the vendored charts from the release assets (gitops-agent: see its
-  README).
+- The hub holds cluster-admin on every spoke.
+- This repo's own charts and values follow `HEAD` of `main`; nothing is pinned
+  per stage. Only the two upstream charts are pinned (ESO `2.15.0`, OpenBao
+  `0.30.7`).
 
 ## Not included yet
 
-- External Secrets for the agent token (carried by a local script today).
-- Per-team namespace confinement on a spoke.
-- Progressive rollout across upgrade groups (the hub does not enable
-  progressive syncs).
-- Terraform/EKS, the `application-sets` chart with addons and monitoring,
-  Harness SMP, the Harness Argo plugin and controller metrics.
+- The hub model running on a cluster, and moving a spoke to it.
+- A persistent secret store.
+- Staged upgrades across stages.
+- Offboarding a team, a spoke or a tenant.
+- Team repositories feeding Applications, and Harness roles for team users.
+- Anything outside local k3d clusters.

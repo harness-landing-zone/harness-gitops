@@ -1,5 +1,12 @@
 # People and ownership
 
+> **Outdated.** This page and its diagram describe the state of 2026-11-13.
+> Since then the Harness API key moved onto each spoke, `spokes.yaml` was
+> replaced by member files and team files, and teams got their own
+> namespaces. Read [Architecture](architecture.md) for the current state. The
+> three actors and the rule "tenant = Harness org, team = Harness project"
+> still hold.
+
 > Draft for review. Status words used on this page: **proven** means run on
 > the local test clusters (one hub, two spokes); **built** means in the repo
 > but not run; **open** means not decided or not built.

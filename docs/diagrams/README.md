@@ -4,7 +4,7 @@ One idea per file. Open and edit them in Draw.io (desktop or app.diagrams.net).
 
 | File | Shows | Used by |
 |---|---|---|
-| `people-and-ownership.drawio` | The three actors and what each owns, by where it lives | [People and ownership](../people-and-ownership.md) |
+| `people-and-ownership.drawio` | The three actors and what each owns, by where it lives. Outdated: state of 2026-11-13. | [People and ownership](../people-and-ownership.md) |
 
 ## Colours
 
