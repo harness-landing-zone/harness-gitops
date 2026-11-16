@@ -1,0 +1,86 @@
+# Registers every cluster that has a member file. A cluster is registered
+# because tenants/<tenant>/clusters/<cluster>/values.yaml exists. The folder
+# name is the Argo CD cluster name and the cluster Secret name.
+#
+# For each file this makes Application register-<cluster> on the hub
+# (charts/cluster-registration). ESO then creates that cluster Secret in
+# hga-hub-agent from OpenBao clusters/<cluster>. Only the connection (server,
+# CA, token) is in the store; the labels (tenant, stage, fleet_member) come
+# from git. spoke-bootstrap selects on those labels.
+#
+# Removing a member file deletes nothing (no prune). Deleting the
+# ExternalSecret deletes the cluster Secret (creationPolicy Owner), so never
+# delete it by hand for a live spoke.
+#
+# No metadata.namespace: the root Application applies this into the hub
+# agent's namespace. A generator that matches nothing still reports success,
+# so check with `kubectl get applications`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-registration
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    # Deleting an Application never deletes the ExternalSecret and with it the
+    # cluster Secret.
+    preserveResourcesOnDeletion: true
+    # Never delete a generated Application. Removing a cluster stays manual.
+    applicationsSync: create-update
+  generators:
+    - matrix:
+        generators:
+          # The hub's own cluster Secret: repo_url and harness_account_id.
+          - clusters:
+              selector:
+                matchLabels:
+                  fleet_member: hub-cluster
+          # One entry per member file.
+          - git:
+              repoURL: '{{ .metadata.annotations.repo_url }}'
+              revision: HEAD
+              files:
+                - path: tenants/*/clusters/*/values.yaml
+  template:
+    metadata:
+      name: 'register-{{ .path.basename }}'
+      labels:
+        app.kubernetes.io/part-of: cluster-registration
+        cluster: '{{ .path.basename }}'
+    spec:
+      project: default
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          path: charts/cluster-registration
+          helm:
+            releaseName: '{{ .path.basename }}'
+            valueFiles:
+              - '$values/{{ .path.path }}/{{ .path.filename }}'
+            # Enforced over the member file.
+            valuesObject:
+              clusterName: '{{ .path.basename }}'
+              tenant: '{{ index .path.segments 1 }}'
+              # The only store allowed to hold cluster connections.
+              store:
+                kind: ClusterSecretStore
+                name: hub-openbao
+              annotations:
+                repo_url: '{{ .metadata.annotations.repo_url }}'
+                harness_account_id: '{{ .metadata.annotations.harness_account_id }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: hga-hub-agent
+      syncPolicy:
+        automated:
+          selfHeal: true
+          # Removing a cluster stays a deliberate act.
+          prune: false
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m
