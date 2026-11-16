@@ -2,7 +2,8 @@
 # (fleet_member: spoke, with tenant and stage labels) it makes one Application
 # <spoke>-teams on that spoke, in namespace <spoke>, running
 # charts/teams-bootstrap with one entry per team from
-# tenants/<tenant>/gitops-agents/<stage>/teams/<team>/values.yaml: its
+# tenants/<tenant>/gitops-agents/defaults/teams/<team>/values.yaml (every
+# stage), then <stage>/teams/<team>/values.yaml (overrides or extra teams): its
 # namespaces (wave 0), its AppProject (1), its mapping (2). Adding a team, a
 # repo or a namespace touches only these files. On a new spoke it retries
 # until the agent's CRDs and agent object exist; the mappings wait for the
@@ -78,6 +79,7 @@ spec:
             # A stage without teams renders nothing.
             ignoreMissingValueFiles: true
             valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/teams/*/values.yaml'
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
             # Enforced: every mapping points at this spoke's agent.
             valuesObject:

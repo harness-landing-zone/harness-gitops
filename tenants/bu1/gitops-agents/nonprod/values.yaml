@@ -1,4 +1,5 @@
 # bu1 spokes labelled stage: nonprod: the agent's values for this stage, layered
 # over ../defaults/values.yaml. Nothing differs from the defaults yet.
-# The stage's teams are teams/<team>/values.yaml beside this file, one per team.
+# The stage gets every team in ../defaults/teams/; add teams/<team>/values.yaml here
+# only to override one (field by field) or add a team for this stage alone.
 # Plain values only: Argo cannot resolve Harness expressions.

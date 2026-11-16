@@ -9,7 +9,8 @@
 #     controller runs; the spoke side is spoke-bootstrap/spoke-runtime.yaml
 #     and spoke-teams.yaml.
 #     Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
-#     <stage>/values.yaml, and the teams under <stage>/teams/.
+#     <stage>/values.yaml, and the teams under defaults/teams/, then
+#     <stage>/teams/ (a stage file overrides a default team field by field).
 #
 # Identity comes from the cluster Secret: org <tenant>, ORG scope, identifier
 # <spoke> with "_". It is immutable, so never rename a spoke's cluster Secret
@@ -120,6 +121,7 @@ spec:
             # A stage without teams renders nothing.
             ignoreMissingValueFiles: true
             valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/teams/*/values.yaml'
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
             # Enforced: every mapping points at this spoke's agent.
             valuesObject:
