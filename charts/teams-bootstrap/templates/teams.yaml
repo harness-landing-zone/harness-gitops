@@ -5,6 +5,12 @@ cluster-scoped kinds), so the platform does. SkipDryRunOnMissingResource: on a
 fresh cluster the Argo and Harness CRDs may still be arriving.
 */}}
 {{- $agent := required "agentName is required" .Values.agentName }}
+{{- $target := .Values.target }}
+{{- if not (has $target (list "all" "hub" "spoke")) }}
+{{- fail "target must be all, hub or spoke" }}
+{{- end }}
+{{- $real := has $target (list "all" "spoke") }}
+{{- $map := has $target (list "all" "hub") }}
 {{- $dns := "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" }}
 {{- range $team, $t := .Values.teams }}
 {{- $prefix := printf "%s-" $team }}
@@ -41,6 +47,7 @@ other teams' namespaces. */}}
 {{- if or (not (hasPrefix $prefix .)) (not (regexMatch $dns .)) (gt (len .) 63) }}
 {{- fail (printf "teams.%s.namespaces: %q must be a valid namespace name starting with %q" $team . $prefix) }}
 {{- end }}
+{{- if $real }}
 ---
 apiVersion: v1
 kind: Namespace
@@ -61,6 +68,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
     helm.sh/resource-policy: keep
 {{- end }}
+{{- end }}
+{{- if $real }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -84,6 +93,28 @@ spec:
   namespaceResourceBlacklist:
     - group: gitops.harness.io
       kind: "*"
+{{- end }}
+{{- if eq $target "hub" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $team | quote }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  description: "Placeholder for the mapping; the real AppProject is on the spoke. Deny-all."
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []
+{{- end }}
+{{- if $map }}
 ---
 apiVersion: gitops.harness.io/v1alpha1
 kind: HarnessGitopsProjectMapping
@@ -107,4 +138,5 @@ spec:
   projectId: {{ required (printf "teams.%s.projectId is required" $team) $t.projectId | quote }}
   # Immutable once the mapping exists.
   autoCreateServiceEnv: false
+{{- end }}
 {{- end }}

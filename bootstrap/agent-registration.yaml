@@ -1,0 +1,127 @@
+# The hub model's hub side. For every spoke cluster Secret with agent_model:
+# hub (and fleet_member: spoke, tenant and stage labels) it makes one
+# Application on the hub, in namespace <spoke>:
+#
+#   <spoke>-registration  charts/fleet-member-registration (target hub): the
+#     HarnessGitopsAgent and the PushSecret that copies the agent's token to
+#     the spoke, wave 1 and 2. Then charts/teams-bootstrap (target hub): one
+#     mapping per team with a deny-all placeholder AppProject. Only the hub's
+#     controller runs; the spoke side is spoke-bootstrap/spoke-runtime.yaml
+#     and spoke-teams.yaml.
+#     Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
+#     <stage>/values.yaml, and the teams under <stage>/teams/.
+#
+# Identity comes from the cluster Secret: org <tenant>, ORG scope, identifier
+# <spoke> with "_". It is immutable, so never rename a spoke's cluster Secret
+# or change its tenant.
+#
+# No metadata.namespace: the root Application applies this into the hub
+# agent's namespace. A selector that matches nothing still reports success, so
+# check with `kubectl get applications`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: agent-registration
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    # Deleting an Application never deletes the agent object or a mapping,
+    # whose finalizers would deregister them in Harness.
+    preserveResourcesOnDeletion: true
+    # Never delete a generated Application. Removing a spoke stays manual.
+    applicationsSync: create-update
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: spoke
+            agent_model: hub
+          # A spoke without these labels is skipped, instead of failing
+          # generation for every spoke.
+          matchExpressions:
+            - {key: tenant, operator: Exists}
+            - {key: stage, operator: Exists}
+  template:
+    metadata:
+      name: '{{ .name }}-registration'
+      labels:
+        app.kubernetes.io/part-of: spoke-bootstrap
+        spoke: '{{ .name }}'
+        role: registration
+    spec:
+      project: default
+      # The hub itself: the objects live beside the hub's controller.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .name }}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          # Removing a spoke stays a deliberate act.
+          prune: false
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          ref: values
+        # Wave 1 and 2: the agent object and the token PushSecret.
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          path: charts/fleet-member-registration
+          helm:
+            releaseName: '{{ .name }}'
+            # The stage file is optional.
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+            # Enforced over the tenant files. Keep equal to the runtime's
+            # identity in spoke-runtime.yaml.
+            valuesObject:
+              target: hub
+              gitopsAgent:
+                harnessAgent:
+                  metadata:
+                    name: '{{ .name }}'
+                  spec:
+                    name: '{{ .name }}'
+                    # Scope, kind and key are never a tenant file's choice, and
+                    # the agent never adopts another one.
+                    scope: ORG
+                    operator: ARGO
+                    type: MANAGED_ARGO_PROVIDER
+                    existingAgentIdentifier: ""
+                    # The tenant's key in the hub's hga-system; it never leaves
+                    # the hub.
+                    apiKeySecretRef: 'harness-api-key-{{ .metadata.labels.tenant }}'
+                    tokenSecretRef: '{{ .name }}-agent-token'
+                agent:
+                  existingSecrets:
+                    agentToken: '{{ .name }}-agent-token'
+                harness:
+                  identity:
+                    accountIdentifier: '{{ .metadata.annotations.harness_account_id }}'
+                    orgIdentifier: '{{ .metadata.labels.tenant }}'
+                    projectIdentifier: ""
+                    agentIdentifier: '{{ .name | replace "-" "_" }}'
+        # Waves 1 and 2: each team's mapping and placeholder AppProject.
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          path: charts/teams-bootstrap
+          helm:
+            releaseName: '{{ .name }}-teams'
+            # A stage without teams renders nothing.
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
+            # Enforced: every mapping points at this spoke's agent.
+            valuesObject:
+              target: hub
+              agentName: '{{ .name }}'

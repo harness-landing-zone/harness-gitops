@@ -1,0 +1,87 @@
+# The team side on every spoke. For every spoke cluster Secret
+# (fleet_member: spoke, with tenant and stage labels) it makes one Application
+# <spoke>-teams on that spoke, in namespace <spoke>, running
+# charts/teams-bootstrap with one entry per team from
+# tenants/<tenant>/gitops-agents/<stage>/teams/<team>/values.yaml: its
+# namespaces (wave 0), its AppProject (1), its mapping (2). Adding a team, a
+# repo or a namespace touches only these files. On a new spoke it retries
+# until the agent's CRDs and agent object exist; the mappings wait for the
+# agent to be healthy. (Hub model: only namespaces and AppProjects here; the
+# mappings are on the hub.)
+#
+# Siblings: spoke-runtime.yaml (Argo CD, agent, locked default),
+# spoke-controller.yaml (v1 only: the controller on the spoke) and
+# bootstrap/agent-registration.yaml (hub model: agent object and mappings on
+# the hub).
+#
+# No metadata.namespace: <hub>-spokes (bootstrap/spokes.yaml) applies this
+# into the hub agent's namespace. A selector that matches nothing still
+# reports success, so check with `kubectl get applications`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: spoke-teams
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    # Deleting an Application never deletes the agent object or a mapping,
+    # whose finalizers would deregister them in Harness.
+    preserveResourcesOnDeletion: true
+    # Never delete a generated Application. Removing a spoke stays manual.
+    applicationsSync: create-update
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: spoke
+          # A spoke without these labels is skipped, instead of failing
+          # generation for every spoke.
+          matchExpressions:
+            - {key: tenant, operator: Exists}
+            - {key: stage, operator: Exists}
+  template:
+    metadata:
+      name: '{{ .name }}-teams'
+      labels:
+        app.kubernetes.io/part-of: spoke-bootstrap
+        spoke: '{{ .name }}'
+        role: teams
+    spec:
+      project: default
+      destination:
+        name: '{{ .name }}'
+        namespace: '{{ .name }}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          # Removing a spoke stays a deliberate act.
+          prune: false
+        syncOptions:
+          - CreateNamespace=true
+          # The Argo CD CRDs exceed the client-side annotation limit.
+          - ServerSideApply=true
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          ref: values
+        # Waves 0 to 2: each team's namespaces, AppProject and mapping.
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: HEAD
+          path: charts/teams-bootstrap
+          helm:
+            releaseName: '{{ .name }}-teams'
+            # A stage without teams renders nothing.
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
+            # Enforced: every mapping points at this spoke's agent.
+            valuesObject:
+              # all = v1: namespaces, AppProjects and mappings here; spoke =
+              # hub model: mappings are on the hub.
+              target: '{{ if eq (index .metadata.labels "agent_model") "hub" }}spoke{{ else }}all{{ end }}'
+              agentName: '{{ .name }}'

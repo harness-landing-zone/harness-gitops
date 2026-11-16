@@ -6,7 +6,7 @@
 # (charts/cluster-registration). ESO then creates that cluster Secret in
 # hga-hub-agent from OpenBao clusters/<cluster>. Only the connection (server,
 # CA, token) is in the store; the labels (tenant, stage, fleet_member) come
-# from git. spoke-bootstrap selects on those labels.
+# from git. The spoke-* ApplicationSets select on those labels.
 #
 # Removing a member file deletes nothing (no prune). Deleting the
 # ExternalSecret deletes the cluster Secret (creationPolicy Owner), so never

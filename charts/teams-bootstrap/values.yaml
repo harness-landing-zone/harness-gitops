@@ -2,6 +2,13 @@
 # mapping points at.
 agentName: ""
 
+# all (default, v1): namespaces, AppProject and mapping here. spoke: namespaces
+# and AppProject only (the hub model's spoke side). hub: the mapping plus a
+# deny-all placeholder AppProject of the same name (the controller marks a
+# mapping Ready only once an AppProject of that name exists beside the agent
+# object; the real one is on the spoke).
+target: all
+
 # One entry per team, keyed by the team name (one file per team, merged). The
 # name is the AppProject, the mapping and the prefix of every namespace.
 #   team-a:

@@ -18,10 +18,17 @@ tenant: ""
 # gitopsAgent is true.
 stage: ""
 # From the member file. true adds the label fleet_member: spoke, which
-# spoke-bootstrap selects on.
+# The spoke-* ApplicationSets select on.
 gitopsAgent: false
 # Annotations for the cluster Secret. Set by bootstrap/: repo_url and
 # harness_account_id, copied from the hub cluster Secret.
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m
+# From the member file (agentModel). "hub" = only the hub's controller runs:
+# the cluster Secret gets the label agent_model: hub, plus the kubeconfig
+# ExternalSecret and push store (templates/push.yaml). Empty = v1, a controller
+# on every spoke.
+agentModel: ""
+# How the agent token reaches the spoke. Only push exists; pull is not built.
+tokenDelivery: push
