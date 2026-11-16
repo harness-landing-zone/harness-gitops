@@ -1,6 +1,7 @@
-# Registers every cluster that has a member file. A cluster is registered
-# because tenants/<tenant>/clusters/<cluster>/values.yaml exists. The folder
-# name is the Argo CD cluster name and the cluster Secret name.
+# Registers every fleet member, as EKS Fleet Management does. A cluster is a
+# member because fleet-members/<cluster>.yaml exists. The file name is the
+# Argo CD cluster name and the cluster Secret name; the file says how the
+# cluster is bootstrapped (tenant, stage, gitopsAgent, agentModel).
 #
 # For each file this makes Application register-<cluster> on the hub
 # (charts/cluster-registration). ESO then creates that cluster Secret in
@@ -41,13 +42,13 @@ spec:
               repoURL: '{{ .metadata.annotations.repo_url }}'
               revision: HEAD
               files:
-                - path: tenants/*/clusters/*/values.yaml
+                - path: fleet-members/*.yaml
   template:
     metadata:
-      name: 'register-{{ .path.basename }}'
+      name: 'register-{{ trimSuffix ".yaml" .path.filename }}'
       labels:
         app.kubernetes.io/part-of: cluster-registration
-        cluster: '{{ .path.basename }}'
+        cluster: '{{ trimSuffix ".yaml" .path.filename }}'
     spec:
       project: default
       sources:
@@ -58,13 +59,13 @@ spec:
           targetRevision: HEAD
           path: charts/cluster-registration
           helm:
-            releaseName: '{{ .path.basename }}'
+            releaseName: '{{ trimSuffix ".yaml" .path.filename }}'
             valueFiles:
               - '$values/{{ .path.path }}/{{ .path.filename }}'
-            # Enforced over the member file.
+            # Enforced over the member file. The cluster's name is the file
+            # name; the tenant is the file's own (the chart validates it).
             valuesObject:
-              clusterName: '{{ .path.basename }}'
-              tenant: '{{ index .path.segments 1 }}'
+              clusterName: '{{ trimSuffix ".yaml" .path.filename }}'
               # Every member: only its ExternalSecret. The store is
               # installed once, by the hub's openbao Application.
               secretStore:

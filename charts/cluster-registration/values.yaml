@@ -10,9 +10,9 @@ secretStore:
 externalSecret:
   enabled: false
 # The Argo CD cluster name and the cluster Secret name. Set by bootstrap/ from
-# the member folder name; also the OpenBao key clusters/<clusterName>.
+# the member file's name; also the OpenBao key clusters/<clusterName>.
 clusterName: ""
-# The business unit. Set by bootstrap/ from the member file's path.
+# The business unit (Harness org). From the member file.
 tenant: ""
 # The stage label (nonprod, prod, ...). From the member file. Required when
 # gitopsAgent is true.
