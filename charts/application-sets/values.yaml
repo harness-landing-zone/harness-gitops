@@ -1,15 +1,22 @@
-# Renders one ApplicationSet per entry under applicationSets. The entries live
-# in a values file of their own (spoke-bootstrap/values.yaml); this file holds
-# only what every ApplicationSet shares.
+# Renders one ApplicationSet per entry under applicationSets. It is installed
+# once per group, as EKS Fleet Management installs its application-sets chart
+# once per add-on group: bootstrap/groups.yaml makes one Application
+# <hub>-<group> per file in groups/, and that file holds the group's entries
+# and settings. This file holds only the defaults every group shares.
 #
 # Argo CD expressions ({{ .name }} and the like) are written as plain strings
 # in values: Helm never templates values, so they reach the ApplicationSet
 # controller unchanged.
 
-# targetRevision of every source the ApplicationSets render. The installer
-# (bootstrap/spokes.yaml) sets it from the hub cluster Secret's annotation
-# repo_revision, HEAD when that annotation is missing. A literal by the time
-# this chart renders.
+# The group's name. Set by the installer from the group file's name; every
+# ApplicationSet and every Application it generates gets the label
+# group: <group>.
+group: ""
+
+# targetRevision of every source the ApplicationSets render, and the revision
+# of every git generator. The installer sets it from the hub cluster Secret's
+# annotation repo_revision, HEAD when that annotation is missing. A literal by
+# the time this chart renders.
 revision: HEAD
 
 # repoURL of every source that names none. Evaluated per cluster by Argo CD.
@@ -18,13 +25,18 @@ repoURL: '{{ .metadata.annotations.repo_url }}'
 # Every Application lands in this Argo CD project.
 project: default
 
-# Application labels every entry gets; an entry's labels override them key by
-# key. Harness indexes an Application's labels only when it is created, so
-# changing these means recreating every Application.
-labels:
-  cluster: '{{ .name }}'
-  tenant: '{{ .metadata.labels.tenant }}'
-  stage: '{{ .metadata.labels.stage }}'
+# Application labels for every entry of the group (a group file sets them);
+# an entry's labels override them key by key. Harness indexes an
+# Application's labels only when it is created, so a label added to a live
+# Application is not filterable until that Application is recreated.
+labels: {}
+
+# Add-on form only: the value files of every add-on, in order. Each prefix
+# becomes $values/<prefix>/<chartName>/values.yaml (a path add-on uses the
+# path's last folder); a missing file is skipped. Empty: no value files. More
+# layers (a tenant, a cluster) are more prefixes, e.g.
+# 'addons/clusters/{{ .name }}'.
+addonValueFiles: []
 
 # The ApplicationSet's own sync policy.
 syncPolicyAppSet:
@@ -48,18 +60,25 @@ syncPolicy:
 
 # One entry per ApplicationSet; the key is its name. Per entry:
 #   enabled      false skips it (default true).
-#   selector     the clusters generator's selector.
+#   selector     the clusters generator's selector. Required: an entry never
+#                matches every cluster by accident.
 #   gitFiles     a git files path: the generator becomes the clusters
 #                generator times one entry per matching file (repoURL and
-#                revision as below), as Fleet Management's gitMatrix.
-#   name         the Application name.
-#   labels       merged over the labels above.
+#                revision as above), as Fleet Management's gitMatrix.
+#   name         the Application name, <cluster>-<part>. Never a version: a
+#                new name is a new Application.
+#   labels       merged over the group's labels.
 #   destination  name (default '{{ .name }}', the generated cluster) and
 #                namespace.
 #   syncOptions  added to syncPolicy.
-#   sources      verbatim, except that repoURL and targetRevision are filled
-#                in where a source leaves them out. An entry's sources are
-#                close to a pass-through of the Application spec: the chart
-#                saves the repeated repoURL, revision and policies, not the
-#                per-chart values.
+# Then either the add-on form:
+#   chartName, chartRepository, defaultVersion   an upstream Helm chart; or
+#   path                                         a chart in this repo;
+#   releaseName        default chartName;
+#   valuesObject       optional;
+#   additionalSources  optional, a list of further sources, as below.
+# or the pass-through:
+#   sources      verbatim. Close to the Application spec's own sources: the
+#                chart only fills in repoURL and targetRevision where a source
+#                leaves them out (additionalSources likewise).
 applicationSets: {}

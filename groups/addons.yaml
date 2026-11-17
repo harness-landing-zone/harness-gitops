@@ -1,0 +1,79 @@
+# Group addons: what the hub itself runs. Installed by bootstrap/groups.yaml
+# as Application <hub>-addons, with charts/application-sets. Every Application
+# it generates gets the label group: addons.
+#
+# Each add-on is selected on fleet_member: hub-cluster alone; spoke Secrets
+# carry fleet_member: spoke and never match. When a second hub needs an
+# add-on switched off, add a label such as enable_external_secrets: "true" to
+# its selector and to the hub cluster Secret (hubCluster.labels in
+# hub/account-agent.yaml), as Fleet Management does.
+#
+# Harness indexes an Application's labels only when it is created, and
+# renaming an Application creates a new one beside the old. Change a name or a
+# label only together with a handover.
+labels:
+  app.kubernetes.io/part-of: hub-addons
+
+# Every add-on's value files, in order, each optional:
+# addons/hub/defaults/<chartName>/values.yaml, then
+# addons/hub/environments/<environment>/<chartName>/values.yaml.
+addonValueFiles:
+  - addons/hub/defaults
+  - 'addons/hub/environments/{{ .metadata.labels.environment }}'
+
+applicationSets:
+
+  # External Secrets Operator on the hub, from the upstream chart (pinned):
+  # hub-cluster-external-secrets, namespace external-secrets. The chart's
+  # defaults (CRDs, controller, cert-controller, webhook) are enough; neither
+  # value file exists yet.
+  hub-external-secrets:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    name: '{{ .name }}-external-secrets'
+    destination:
+      namespace: external-secrets
+    syncOptions:
+      - CreateNamespace=true
+      # The ESO CRDs exceed the client-side annotation limit.
+      - ServerSideApply=true
+    chartRepository: https://charts.external-secrets.io
+    chartName: external-secrets
+    defaultVersion: 2.15.0
+
+  # OpenBao on the hub, in dev mode, from the upstream chart (pinned), plus
+  # the one ClusterSecretStore through which ESO reads it: hub-cluster-openbao,
+  # namespace openbao.
+  #
+  # Dev mode is for the k3d proof only: one pod, in memory, no unsealing.
+  # Every restart empties the store, so every spoke's entry must be written
+  # again (local/k3d.sh register). Cluster Secrets already made from it stay
+  # in place meanwhile. The store holds cluster connections (clusters/<cluster>:
+  # server, caData, token) and self-managed spokes' controller keys
+  # (harness-api-keys/<cluster>). The store objects need ESO's CRDs from
+  # hub-external-secrets; until they exist, that part of the sync retries.
+  hub-openbao:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    name: '{{ .name }}-openbao'
+    destination:
+      namespace: openbao
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    chartRepository: https://openbao.github.io/openbao-helm
+    chartName: openbao
+    defaultVersion: 0.30.7
+    additionalSources:
+      # The ClusterSecretStore and its dev token Secret, from the
+      # registration chart (store on, no member ExternalSecret).
+      - path: charts/cluster-registration
+        helm:
+          releaseName: openbao-store
+          valuesObject:
+            secretStore:
+              enabled: true
+            externalSecret:
+              enabled: false

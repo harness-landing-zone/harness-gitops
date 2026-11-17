@@ -1,13 +1,34 @@
-# This chart has two parts: the store (installed once, on the hub) and one
-# ExternalSecret per member cluster.
+# This chart has three parts: the store (installed once, on the hub), one
+# ExternalSecret per member cluster, and optional repository credentials.
 #
-# The ClusterSecretStore (plus its dev token Secret). The ExternalSecret reads
-# from the store of this name. Rendered only on the hub's one store release.
+# The ClusterSecretStore (plus its dev token Secret). Every ExternalSecret this
+# chart renders reads from the store of this name. Rendered only on the hub's
+# one store release (the hub-openbao add-on in groups/addons.yaml).
 secretStore:
   enabled: false
   name: hub-openbao
-# One per member. The cluster-registration entry in spoke-bootstrap/values.yaml
-# turns it on.
+  # The only namespaces whose ExternalSecrets may read the store: where the
+  # hub's Argo CD keeps its cluster Secrets.
+  namespaces:
+    - hga-hub-agent
+  # The ClusterSecretStore's spec.provider, verbatim (any ESO provider). The
+  # default is the hub's dev OpenBao.
+  provider:
+    vault:
+      server: http://openbao.openbao.svc:8200
+      path: secret
+      version: v2
+      auth:
+        tokenSecretRef:
+          name: openbao-dev-root-token
+          namespace: openbao
+          key: token
+  # DEV ONLY: renders Secret openbao-dev-root-token (the dev OpenBao's
+  # published root token, see templates/secretstore.yaml). Turn it off with
+  # any other provider or auth.
+  devRootToken: true
+# One per member. The cluster-registration entry in groups/fleet.yaml turns it
+# on.
 externalSecret:
   enabled: false
 # The Argo CD cluster name and the cluster Secret name. Set by bootstrap/ from
@@ -25,7 +46,29 @@ gitopsAgent: false
 # harness_account_id, copied from the hub cluster Secret.
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
+# Every ExternalSecret of this chart uses it.
 refreshInterval: 1m
+# Argo CD repository credentials built by ESO from the store, for an Argo CD
+# that gets no credential from elsewhere. Off: this hub's credential comes
+# from the hub pipeline (bootstrap-repo-creds). Rendered in namespace, which
+# must be the Argo CD namespace and one of secretStore.namespaces.
+repoCredentials:
+  enabled: false
+  # githubApp, ssh or http. The store entry's properties, by type:
+  #   githubApp  github_app_id, github_app_installation_id, github_private_key
+  #   ssh        private_key
+  #   http       username, password
+  type: githubApp
+  # The store entry, e.g. git/repo-creds.
+  key: ""
+  # The URL prefix the credential applies to (secretType repo-creds), or one
+  # repository's URL (secretType repository).
+  url: ""
+  secretType: repo-creds
+  # The Secret's (and the ExternalSecret's) name.
+  name: repo-creds
+  # Empty: the release namespace.
+  namespace: ""
 # From the member file (agentModel). "hub" = only the hub's controller runs:
 # the cluster Secret gets the label agent_model: hub, plus the kubeconfig
 # ExternalSecret and push store (templates/push.yaml). Empty = v1, a controller

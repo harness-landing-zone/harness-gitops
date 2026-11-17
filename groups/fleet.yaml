@@ -1,0 +1,66 @@
+# Group fleet: what makes a cluster a member of the fleet. Installed by
+# bootstrap/groups.yaml as Application <hub>-fleet, with charts/application-sets.
+# Every Application it generates gets the label group: fleet.
+#
+# Harness indexes an Application's labels only when it is created, and
+# renaming an Application creates a new one beside the old. Change a name or a
+# label only together with a handover.
+#
+# An ApplicationSet whose generator matches nothing still reports success, so
+# check with `kubectl get applications`.
+labels:
+  app.kubernetes.io/part-of: cluster-registration
+
+applicationSets:
+
+  # Registers every fleet member, as EKS Fleet Management does. A cluster is a
+  # member because fleet-members/<cluster>.yaml exists. The file name is the
+  # Argo CD cluster name and the cluster Secret name; the file says how the
+  # cluster is bootstrapped (tenant, stage, gitopsAgent, agentModel).
+  #
+  # For each file this makes Application <cluster>-cluster on the hub
+  # (charts/cluster-registration). ESO then creates that cluster Secret in
+  # hga-hub-agent from OpenBao clusters/<cluster>. Only the connection (server,
+  # CA, token) is in the store; the labels (tenant, stage, fleet_member) come
+  # from git. The spoke-* ApplicationSets select on those labels.
+  #
+  # Removing a member file deletes nothing. Deleting the ExternalSecret deletes
+  # the cluster Secret (creationPolicy Owner), so never delete it by hand for a
+  # live spoke.
+  cluster-registration:
+    # The hub's own cluster Secret (repo_url, harness_account_id) times one
+    # entry per member file.
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: fleet-members/*.yaml
+    name: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
+    labels:
+      cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+      # From the member file; "" when a file leaves them out.
+      tenant: '{{ default "" (index . "tenant") }}'
+      stage: '{{ default "" (index . "stage") }}'
+    # The hub, from the matrix.
+    destination:
+      namespace: hga-hub-agent
+    sources:
+      - ref: values
+      - path: charts/cluster-registration
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}'
+          valueFiles:
+            - '$values/{{ .path.path }}/{{ .path.filename }}'
+          # Enforced over the member file. The cluster's name is the file
+          # name; the tenant is the file's own (the chart validates it).
+          valuesObject:
+            clusterName: '{{ trimSuffix ".yaml" .path.filename }}'
+            # Every member: only its ExternalSecret. The store is installed
+            # once, by the hub's openbao Application.
+            secretStore:
+              enabled: false
+              name: hub-openbao
+            externalSecret:
+              enabled: true
+            annotations:
+              repo_url: '{{ .metadata.annotations.repo_url }}'
+              harness_account_id: '{{ .metadata.annotations.harness_account_id }}'

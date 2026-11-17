@@ -1,8 +1,9 @@
 apiVersion: v2
 name: cluster-registration
 description: |
-  Two parts. The store (once, on the hub): the ClusterSecretStore for OpenBao.
-  One ExternalSecret per member: it builds the Argo CD cluster Secret from
-  OpenBao; the labels come from git.
+  Three parts. The store (once, on the hub): the ClusterSecretStore, OpenBao by
+  default. One ExternalSecret per member: it builds the Argo CD cluster Secret
+  from the store; the labels come from git. Optional Argo CD repository
+  credentials from the store.
 version: 0.1.0
 type: application
