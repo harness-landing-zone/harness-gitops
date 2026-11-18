@@ -4,5 +4,17 @@ account_id = "REPLACE_WITH_HARNESS_ACCOUNT_ID"
 # Defaults; change only if you need to.
 # github_org     = "harness-landing-zone"  # owner of your fork, if you use one
 # org_id         = "gitops_reference"
+# org_name       = "GitOps Reference Architecture"
 # project_id     = "gitops_admin"
+# project_name   = "GitOps Admin"
 # environment_id = "test"
+
+# The tenants: one organization each, one project per team. Changing these
+# identifiers needs a fork, because the repository names them too (see
+# "Your own names" in the workshop README).
+# business_units = {
+#   bu1 = {
+#     name     = "Business Unit 1"
+#     projects = { team_a = "Team A", team_b = "Team B" }
+#   }
+# }

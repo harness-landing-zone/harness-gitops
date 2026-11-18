@@ -56,7 +56,7 @@ account_id = "YOUR_HARNESS_ACCOUNT_ID"
 # github_org = "YOUR_GITHUB_OWNER"
 ```
 
-Use the defaults for the Harness organization `gitops_reference`, project `gitops_admin` and environment `test`. Apply in the `default` workspace with local state. The hub workspace reads `workshop/1-harness-setup/terraform.tfstate` for the keys and identifiers.
+The defaults create the Harness organization `gitops_reference`, project `gitops_admin`, environment `test` and one tenant organization `bu1` with projects `team_a` and `team_b`. To use your own names, see [Your own names](#your-own-names) before you apply. Apply in the `default` workspace with local state. The hub workspace reads `workshop/1-harness-setup/terraform.tfstate` for the keys and identifiers.
 
 ```bash
 unset TF_WORKSPACE
@@ -67,6 +67,28 @@ tofu -chdir=workshop/1-harness-setup apply
 ```
 
 Review the plan for the intended account before confirming. Keep both modules' state, saved plans and `terraform.tfvars` private. Local state contains the generated tokens. [Harness setup resources](1-harness-setup/README.md)
+
+### Your own names
+
+Set any of these in `terraform.tfvars`:
+
+| Variable | What it names | Default |
+|---|---|---|
+| `org_id`, `org_name` | The platform organization | `gitops_reference`, "GitOps Reference Architecture" |
+| `project_id`, `project_name` | The admin project that the hub's AppProject `default` maps to | `gitops_admin`, "GitOps Admin" |
+| `environment_id` | The hub: its agent is `hga-<id>-hub` | `test` |
+| `business_units` | The tenant organizations and their team projects | `bu1` with `team_a`, `team_b` |
+
+The platform organization, project and environment need nothing else: the hub install reads them from this stage's outputs.
+
+The tenant and team identifiers are also written in the repository, so changing `business_units` needs a fork (set `github_org`) with the same names in:
+
+- the folder `tenants/<tenant>/`;
+- `tenant:` in each `fleet-members/*.yaml`;
+- `bu:` in each spoke's `workshop/2-clusters/cluster-values/*.yaml`;
+- `projectId:` in `tenants/<tenant>/gitops-agents/defaults/teams/<team>/values.yaml`.
+
+The controller's role, service account and key are named `hga_controller` at account level, so one Harness account holds one workshop.
 
 ## 2. Create the hub
 
