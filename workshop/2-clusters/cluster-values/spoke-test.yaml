@@ -1,7 +1,7 @@
-# A spoke that runs its own controller: workspace spoke-test, k3d cluster
+# A self-managed spoke (it runs its own controller): workspace spoke-test, k3d cluster
 # hga-spoke-test, its own Harness key in OpenBao.
 role: spoke
-# The BU's Harness org. Its role hga_controller_<bu> comes from
+# The tenant's Harness org (a tenant can be a business unit). Its role hga_controller_<bu> comes from
 # ../1-harness-setup.
 bu: bu1
 # Where the key is written in OpenBao (on EKS: the Secrets Manager secret

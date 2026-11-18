@@ -7,13 +7,13 @@
 # namespaces (wave 0), its AppProject (1), its mapping (2). Adding a team, a
 # repo or a namespace touches only these files. On a new spoke it retries
 # until the agent's CRDs and agent object exist; the mappings wait for the
-# agent to be healthy. (Hub model: only namespaces and AppProjects here; the
-# mappings are on the hub.)
+# agent to be healthy. (Hub-managed: only namespaces and AppProjects here;
+# the mappings are on the hub.)
 #
 # Siblings: spoke-runtime.yaml (Argo CD, agent, locked default),
-# spoke-controller.yaml (v1 only: the controller on the spoke) and
-# bootstrap/agent-registration.yaml (hub model: agent object and mappings on
-# the hub).
+# spoke-controller.yaml (self-managed only: the controller on the spoke) and
+# bootstrap/agent-registration.yaml (hub-managed: agent object and mappings
+# on the hub).
 #
 # No metadata.namespace: <hub>-spokes (bootstrap/spokes.yaml) applies this
 # into the hub agent's namespace. A selector that matches nothing still
@@ -85,7 +85,7 @@ spec:
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
             # Enforced: every mapping points at this spoke's agent.
             valuesObject:
-              # all = v1: namespaces, AppProjects and mappings here; spoke =
-              # hub model: mappings are on the hub.
+              # all = self-managed: namespaces, AppProjects and mappings here;
+              # spoke = hub-managed: mappings are on the hub.
               target: '{{ if eq (index .metadata.labels "agent_model") "hub" }}spoke{{ else }}all{{ end }}'
               agentName: '{{ .name }}'

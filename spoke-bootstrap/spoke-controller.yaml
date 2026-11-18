@@ -1,15 +1,15 @@
-# Scaffolding for the v1 model (a controller on every spoke). Delete this file
-# once every spoke runs the hub model (label agent_model: hub).
-#
-# For every spoke cluster Secret without agent_model: hub it makes one
-# Application <spoke>-controller on that spoke, in namespace hga-system: the
-# controller and its CRDs. The key Secret harness-api-key-secret in hga-system
-# is created by hand on each v1 spoke, never in git. The runtime's agent
-# object (spoke-runtime.yaml) retries until this controller's CRDs
-# exist.
+# The controller of every self-managed spoke (controller, key and agent
+# objects on the spoke). For every spoke cluster Secret without agent_model:
+# hub it makes one Application <spoke>-controller on that spoke, in namespace
+# hga-system: the controller and its CRDs. The key Secret
+# harness-api-key-secret in hga-system never comes from git: the hub pushes it
+# from OpenBao when the member file sets harnessSecretName
+# (charts/cluster-registration), otherwise it is created by hand. The
+# runtime's agent object (spoke-runtime.yaml) retries until this controller's
+# CRDs exist.
 #
 # Siblings: spoke-runtime.yaml, spoke-teams.yaml and
-# bootstrap/agent-registration.yaml (hub model: agent object and mappings on
+# bootstrap/agent-registration.yaml (hub-managed: agent object and mappings on
 # the hub).
 #
 # No metadata.namespace: <hub>-spokes (bootstrap/spokes.yaml) applies this
@@ -23,8 +23,9 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   syncPolicy:
-    # Deleting an Application never deletes the agent object or a mapping,
-    # whose finalizers would deregister them in Harness.
+    # Deleting an Application never deletes the controller or its CRDs
+    # (deleting the CRDs would delete every agent object and mapping on the
+    # spoke).
     preserveResourcesOnDeletion: true
     # Never delete a generated Application. Removing a spoke stays manual.
     applicationsSync: create-update
@@ -38,7 +39,8 @@ spec:
           matchExpressions:
             - {key: tenant, operator: Exists}
             - {key: stage, operator: Exists}
-            # A missing label counts as not hub, so today's spokes match.
+            # A missing label counts as not hub: a self-managed spoke needs no
+            # agent_model label.
             - {key: agent_model, operator: NotIn, values: [hub]}
   template:
     metadata:

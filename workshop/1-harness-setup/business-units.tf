@@ -1,6 +1,5 @@
-# One Harness org per business unit, one project per team. Each BU gets one
-# namespaced Argo CD and ORG agent on the hub (its org file under
-# environments/); its teams are AppProjects mapped onto these projects.
+# One Harness org per tenant (here a business unit), one project per team.
+# The teams are AppProjects mapped onto these projects.
 locals {
   business_units = {
     bu1 = {
@@ -31,10 +30,11 @@ resource "harness_platform_project" "team" {
   tags       = ["purpose:reference-architecture"]
 }
 
-# Each BU's own controller identity: an org-scoped service account that may
+# Each tenant's own controller identity: an org-scoped service account that may
 # only manage GitOps agents and their project mappings inside that org. Its
-# token is the key the controller uses for that BU's agents (apiKeySecretRef
-# harness-api-key-<bu>), so a BU's agents never ride on the account-level key.
+# token is the key the hub's controller uses for that tenant's hub-managed
+# spokes (apiKeySecretRef harness-api-key-<bu>), so their agents never ride on
+# the account-level key.
 resource "harness_platform_roles" "bu_controller" {
   for_each   = local.business_units
   identifier = "hga_controller_${each.key}"

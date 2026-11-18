@@ -100,8 +100,8 @@ resource "terraform_data" "delegate" {
   depends_on = [terraform_data.hub_cluster]
 }
 
-# A spoke runs its own controller, which needs an API key on the spoke. Each
-# spoke gets its own key, scoped to its business unit's org, so no spoke holds
+# A self-managed spoke runs its own controller, which needs an API key on the
+# spoke. Each spoke gets its own key, scoped to its tenant's org, so no spoke holds
 # a key that reaches beyond its org or that another spoke shares. No Harness
 # secret: nothing in Harness reads it. Registering the spoke in GitOps stays a
 # commit of fleet-members/<name>.yaml.
@@ -117,8 +117,8 @@ resource "harness_platform_service_account" "spoke_agent" {
   depends_on = [terraform_data.values]
 }
 
-# The BU controller's role (hga_controller_<bu>, from ../1-harness-setup): the
-# same rights, only inside the BU's org.
+# The tenant's controller role (hga_controller_<bu>, from ../1-harness-setup):
+# the same rights, only inside the tenant's org.
 resource "harness_platform_role_assignments" "spoke_agent" {
   count                     = local.role == "spoke" ? 1 : 0
   org_id                    = local.bu

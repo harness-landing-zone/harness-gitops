@@ -1,4 +1,5 @@
-# The hub model's hub side. For every spoke cluster Secret with agent_model:
+# The hub-managed model's hub side (key and agent objects stay on the hub).
+# For every spoke cluster Secret with agent_model:
 # hub (and fleet_member: spoke, tenant and stage labels) it makes one
 # Application on the hub, in namespace <spoke>:
 #
@@ -12,7 +13,8 @@
 #     <stage>/values.yaml, and the teams under defaults/teams/, then
 #     <stage>/teams/ (a stage file overrides a default team field by field).
 #
-# Identity comes from the cluster Secret: org <tenant>, ORG scope, identifier
+# Identity comes from the cluster Secret: the Harness org named after the
+# spoke's tenant, ORG scope, identifier
 # <spoke> with "_". It is immutable, so never rename a spoke's cluster Secret
 # or change its tenant.
 #

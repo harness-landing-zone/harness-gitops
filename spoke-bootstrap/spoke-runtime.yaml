@@ -4,20 +4,23 @@
 #
 #   wave 0  charts/gitops-agent: Argo CD with its CRDs, the agent's config.
 #   wave 1  charts/fleet-member-registration: the HarnessGitopsAgent and a
-#           locked default AppProject. (Hub model: only the locked default;
-#           the agent object lives on the hub.)
-#   wave 3  the agent Deployment. The controller writes <spoke>-agent-token
-#           beside it; nothing carries a token between clusters.
+#           locked default AppProject. (Hub-managed: only the locked
+#           default; the agent object lives on the hub.)
+#   wave 3  the agent Deployment. Self-managed: the spoke's controller writes
+#           <spoke>-agent-token beside it. Hub-managed: the hub's controller
+#           writes it on the hub and ESO pushes it here
+#           (bootstrap/agent-registration.yaml).
 #
 # Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
 # <stage>/values.yaml.
 #
 # Siblings: spoke-teams.yaml (team namespaces, AppProjects,
-# mappings), spoke-controller.yaml (v1 only: the controller on the
-# spoke) and bootstrap/agent-registration.yaml (hub model: agent object and
+# mappings), spoke-controller.yaml (self-managed only: the controller on the
+# spoke) and bootstrap/agent-registration.yaml (hub-managed: agent object and
 # mappings on the hub).
 #
-# Identity comes from the cluster Secret: org <tenant>, ORG scope, identifier
+# Identity comes from the cluster Secret: the Harness org named after the
+# spoke's tenant, ORG scope, identifier
 # <spoke> with "_". It is immutable, so never rename a spoke's cluster Secret
 # or change its tenant.
 #
@@ -92,14 +95,15 @@ spec:
               - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
             valuesObject:
               gitopsAgent:
-                # The agent object and mappings come from the third chart.
+                # The agent object comes from the next source; the mappings
+                # from spoke-teams.yaml.
                 harnessAgent:
                   enabled: false
                 # A real empty list: gitops-helm fails if mappings exist while
                 # the agent object is off, and a null breaks its len check.
                 projectMappings: []
-                # Needs the CRDs at render time; the third chart renders the
-                # AppProjects instead.
+                # Needs the CRDs at render time; the next source renders the
+                # locked default, spoke-teams.yaml the teams' AppProjects.
                 appProject:
                   enabled: false
                 harness:
@@ -146,8 +150,8 @@ spec:
             # Enforced over the tenant files. Keep equal to the runtime's
             # identity above.
             valuesObject:
-              # all = v1: agent object and locked default here; spoke = hub
-              # model: only the locked default.
+              # all = self-managed: agent object and locked default here;
+              # spoke = hub-managed: only the locked default.
               target: '{{ if eq (index .metadata.labels "agent_model") "hub" }}spoke{{ else }}all{{ end }}'
               gitopsAgent:
                 harnessAgent:

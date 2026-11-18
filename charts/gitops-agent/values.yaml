@@ -6,9 +6,8 @@
 gitopsAgent:
   # Condition of the gitops-helm dependency.
   enabled: true
-  # The few defaults this chart changes in gitops-helm. They carry over what
-  # the retired bootstrap wrapper chart set, so hub and org
-  # installs behave as before.
+  # The few defaults this chart changes in gitops-helm, for the hub and every
+  # spoke runtime alike.
   # Render the HarnessGitopsAgent (gitops-helm defaults to false).
   harnessAgent:
     enabled: true
@@ -21,8 +20,8 @@ gitopsAgent:
       http:
         agentHttpTarget: https://app.harness.io/gitops
       logLevel: info
-  # Smaller than gitops-helm's 1 CPU per component, so a hub and its org
-  # shards fit on a small cluster.
+  # Smaller than gitops-helm's 1 CPU per component, so the hub and each
+  # spoke fit on a small cluster.
   agent:
     resources:
       requests: {cpu: 250m, memory: 256Mi}
@@ -65,7 +64,7 @@ apiKeySecret:
   # Supply only at deploy time from the CD platform's secret manager.
   value: ""
   # More key Secrets in the same namespace, name: value, for example a
-  # business unit's org-scoped key. Same supply rule as value.
+  # tenant's org-scoped key. Same supply rule as value.
   extra: {}
   # Keep the Secret on helm uninstall: the controller finalizer still needs it
   # to deregister the agent while the agent object is deleted.

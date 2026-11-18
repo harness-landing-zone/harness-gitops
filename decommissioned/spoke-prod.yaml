@@ -1,16 +1,20 @@
-# spoke-prod is a fleet member because this file exists. The file name is the
+# spoke-prod was a fleet member while this file was in fleet-members/. Nothing
+# reads decommissioned/: the file is kept as a record. The file name was the
 # cluster's name: its Argo CD cluster Secret on the hub and its OpenBao entry
-# clusters/spoke-prod. The store holds only the connection (written by
-# local/k3d.sh register); how the cluster is bootstrapped is set here, and
-# bootstrap/cluster-registration.yaml turns it into the cluster Secret's labels.
+# clusters/spoke-prod, which held only the connection (written by
+# workshop/2-clusters/k3d.sh register); how the cluster was bootstrapped is set
+# here, and bootstrap/cluster-registration.yaml turned it into the cluster
+# Secret's labels.
 
-# The Harness org the agent registers under; its values and teams are in
-# tenants/<tenant>/gitops-agents/. Reviewed like any identity: never change it.
+# The tenant that owns this spoke, and the Harness org the agent registers
+# under; its values and teams are in tenants/<tenant>/gitops-agents/. Reviewed
+# like any identity: never change it.
 tenant: bu1
 # The stage folder of tenants/<tenant>/gitops-agents/ (values and teams).
 stage: prod
 # true: install a GitOps agent on this cluster (label fleet_member: spoke).
 gitopsAgent: true
-# Where the agent's controller runs: "" = on this cluster (v1); hub = only the
-# hub's controller, the token pushed by ESO (label agent_model: hub).
+# The model. "" = self-managed: controller, key and agent objects on this
+# spoke. hub = hub-managed: key and agent objects stay on the hub, its
+# controller does the work and ESO pushes the token (label agent_model: hub).
 agentModel: "hub"

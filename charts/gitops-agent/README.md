@@ -14,8 +14,9 @@ bootstrap templates, the `HarnessGitopsAgent`, its
 | `hub-cluster-secret.yaml` | `hubCluster` | labelled `hub-cluster` cluster Secret |
 | `root-appset.yaml` | `rootAppSet` | root ApplicationSet (and with `createProject` its AppProject) as hooks |
 
-All four are off by default. Org shards (`bootstrap/orgs.yaml`) use none of
-them.
+All four are off by default. Only the hub release (`hub/account-agent.yaml`)
+turns them on; spoke runtimes (`spoke-bootstrap/spoke-runtime.yaml`) use none
+of them.
 
 ## Why the extras exist
 
@@ -48,4 +49,4 @@ smaller resource requests).
    index lists the version, `helm dependency update` does both (and fixes the
    lock digest); until then the lock is written by hand.
 3. Diff the old and new `values.yaml` and `templates/bootstrap/`, then render
-   the hub and an org file and compare.
+   the hub (`hub/account-agent.yaml`) and a spoke runtime and compare.

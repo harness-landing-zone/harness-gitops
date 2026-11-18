@@ -1,12 +1,13 @@
 # The agent's Harness side: the HarnessGitopsAgent and the locked default
-# AppProject, in the agent's namespace beside the controller that registers it.
+# AppProject, in the agent's namespace, on the cluster whose controller
+# registers it (the spoke when self-managed, the hub when hub-managed).
 # Same keys as charts/gitops-agent (gitopsAgent.*). The teams are
 # charts/teams-bootstrap.
 
-# all (default, v1): the agent object and the locked default AppProject here.
-# hub: the agent object and the PushSecret (the hub model, rendered on the hub
-# in namespace <cluster>). spoke: only the locked default AppProject (the hub
-# model's spoke side).
+# all (default; a self-managed spoke): the agent object and the locked default
+# AppProject here. hub: the agent object and the PushSecret (a hub-managed
+# spoke, rendered on the hub in namespace <cluster>). spoke: only the locked
+# default AppProject (a hub-managed spoke's own side).
 target: all
 
 gitopsAgent:

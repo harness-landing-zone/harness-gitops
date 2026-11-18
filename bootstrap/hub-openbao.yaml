@@ -4,11 +4,13 @@
 #
 # Dev mode is for the k3d proof only: one pod, in memory, no unsealing. Every
 # restart empties the store, so every spoke's entry must be written again
-# (local/k3d.sh register). Cluster Secrets already made from it stay in place
-# meanwhile.
+# (workshop/2-clusters/k3d.sh register). Cluster Secrets already made from it
+# stay in place meanwhile.
 #
-# The store holds only cluster connections: clusters/<cluster> with keys
-# server, caData and token. Harness API keys never enter it.
+# The store holds cluster connections (clusters/<cluster> with keys server,
+# caData and token) and each self-managed spoke's controller key
+# (harness-api-keys/<cluster>, property api_key), which the hub pushes to that
+# spoke. The hub's own key never enters it.
 #
 # Selected on fleet_member: hub-cluster alone, as hub-external-secrets is. The
 # store objects need ESO's CRDs from hub-external-secrets; until they exist,

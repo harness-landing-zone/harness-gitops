@@ -8,16 +8,17 @@
 # No image versions are set here on purpose: the official chart's own defaults
 # for Argo CD, redis and the agent are the tested combination.
 
-# The ONE central API-key Secret, named by
-# gitopsAgent.harnessAgent.spec.apiKeySecretRef. The controller reads it from
-# its own namespace, hga-system, for every agent on the hub, org agents
-# included.
+# The ONE central API-key Secret, harness-api-key-secret: gitops-helm's
+# default for gitopsAgent.harnessAgent.spec.apiKeySecretRef, which this file
+# leaves unset. The controller reads it from its own namespace, hga-system,
+# for this hub agent. Hub-managed spoke agents use their tenant's key below.
 apiKeySecret:
   create: true
   namespace: hga-system
   value: '<+secrets.getValue("HGA-Token")>'
-  # One org-scoped key per business unit. Agent objects for that BU's spokes
-  # name it in spec.apiKeySecretRef.
+  # One org-scoped key per tenant (here bu1). The agent objects of that
+  # tenant's hub-managed spokes name it in spec.apiKeySecretRef
+  # (harness-api-key-TENANT, set by bootstrap/agent-registration.yaml).
   extra:
     harness-api-key-bu1: '<+secrets.getValue("hga_controller_bu1_token")>'
 

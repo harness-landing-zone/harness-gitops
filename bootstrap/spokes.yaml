@@ -6,13 +6,13 @@
 # agent's namespace. Those ApplicationSets then make the Applications for
 # every spoke.
 #
-# bootstrap/ keeps what the hub itself needs (its add-ons, cluster
-# registration, the hub half of the agents); spoke-bootstrap/ keeps what is
-# installed on the spokes.
+# bootstrap/ is applied by the root Application on the hub: the hub's
+# add-ons, cluster registration, the hub-managed agents' registration and this
+# file. spoke-bootstrap/ holds the per-spoke ApplicationSets (controller,
+# runtime, teams), whose Applications install on the spokes.
 #
 # No metadata.namespace: the root Application applies this into the hub
-# agent's namespace. Never name this ApplicationSet spoke-bootstrap: that name
-# is the earlier ApplicationSet that still owns the spokes' Applications.
+# agent's namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

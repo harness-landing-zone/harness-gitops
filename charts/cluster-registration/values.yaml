@@ -1,34 +1,37 @@
-# This chart has two parts: the store (installed once, on the hub) and one
-# ExternalSecret per member cluster.
+# The store (installed once, on the hub), and per fleet member the cluster
+# Secret's ExternalSecret plus, when needed, the push resources
+# (templates/push.yaml).
 #
 # The ClusterSecretStore (plus its dev token Secret). The ExternalSecret reads
 # from the store of this name. Rendered only on the hub's one store release.
 secretStore:
   enabled: false
   name: hub-openbao
-# One per member. bootstrap/cluster-registration.yaml turns it on.
+# One per fleet member. bootstrap/cluster-registration.yaml turns it on.
 externalSecret:
   enabled: false
-# The Argo CD cluster name and the cluster Secret name. Set by bootstrap/ from
-# the member file's name; also the OpenBao key clusters/<clusterName>.
+# The Argo CD cluster name and the cluster Secret name. Set by
+# bootstrap/cluster-registration.yaml from the member file's name; also the OpenBao key clusters/<clusterName>.
 clusterName: ""
-# The business unit (Harness org). From the member file.
+# The tenant that owns the cluster (its Harness org; a tenant can be a
+# business unit). From the member file.
 tenant: ""
 # The stage label (nonprod, prod, ...). From the member file. Required when
 # gitopsAgent is true.
 stage: ""
 # From the member file. true adds the label fleet_member: spoke, which
-# The spoke-* ApplicationSets select on.
+# spoke-bootstrap/ and bootstrap/agent-registration.yaml select on.
 gitopsAgent: false
-# Annotations for the cluster Secret. Set by bootstrap/: repo_url and
+# Annotations for the cluster Secret. Set by
+# bootstrap/cluster-registration.yaml: repo_url and
 # harness_account_id, copied from the hub cluster Secret.
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m
-# From the member file (agentModel). "hub" = only the hub's controller runs:
-# the cluster Secret gets the label agent_model: hub, plus the kubeconfig
-# ExternalSecret and push store (templates/push.yaml). Empty = v1, a controller
-# on every spoke.
+# From the member file (agentModel). "hub" = hub-managed: only the hub's
+# controller runs; the cluster Secret gets the label agent_model: hub, plus the
+# kubeconfig ExternalSecret and push store (templates/push.yaml). Empty =
+# self-managed: the spoke runs its own controller.
 agentModel: ""
 # From the member file. Self-managed spokes (agentModel "") only: the OpenBao
 # path of this spoke's own controller key (property api_key), written by
