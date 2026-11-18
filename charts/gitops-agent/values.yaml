@@ -104,6 +104,10 @@ hubCluster:
   fleetMember: hub-cluster
   # Extra labels/annotations stamped on the Secret.
   labels: {}
+  # A JSON object of another cluster Secret's labels; only its add-on
+  # switches (keys starting enable_) are copied. Used for a spoke that
+  # installs its own add-ons (groups/agents.yaml, runtime).
+  labelsJson: ""
   annotations: {}
 
 # Root ApplicationSet: the group installer. For each file in groupsPath it
@@ -117,12 +121,14 @@ rootAppSet:
   repoURL: ""
   # Folder of group files in that repository: one values file per group.
   groupsPath: groups
+  # Group files to install, by name without .yaml. Empty = every file.
+  groups: []
   # Branch, tag or commit for the group files, the chart and what the groups
   # install from this repository.
   targetRevision: HEAD
   # Destination cluster of the group Applications. Empty: hubCluster.name.
   destinationName: ""
-  # AppProject of the group Applications.
+  # AppProject of the group Applications and of what the groups generate.
   project: default
   # Also create that AppProject as a hook (weight 0, before the
   # ApplicationSet), with gitopsAgent.appProject.description. Use this instead

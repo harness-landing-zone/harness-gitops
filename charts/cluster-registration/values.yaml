@@ -25,7 +25,8 @@ stage: ""
 model: ""
 # From the member file, stamped as label addons: who installs this cluster's
 # add-ons. hub (the default): the hub's Argo CD pushes them. self: the
-# cluster's own Argo CD installs them; refused until that side is built.
+# cluster's own Argo CD installs them (model: agent only), reading this
+# repository itself.
 addons: hub
 # From the member file: extra labels for the cluster Secret. An add-on's
 # switch goes here, for example enable_external_secrets: "true"

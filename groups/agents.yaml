@@ -121,10 +121,26 @@ applicationSets:
               create: false
             gitSecret:
               create: false
-            rootAppSet:
-              enabled: false
+            # A spoke labelled addons: self installs its own add-ons: it
+            # gets a cluster Secret naming itself, with its add-on switches,
+            # and a root that installs only the addons group, in AppProject
+            # addons (the spoke's default project is locked). The spoke's
+            # Argo CD must be able to read this repository. For addons: hub
+            # both stay off.
             hubCluster:
-              enabled: false
+              enabled: '{{ eq (index .metadata.labels "addons") "self" }}'
+              name: '{{ .name }}'
+              fleetMember: self
+              labelsJson: '{{ toJson .metadata.labels }}'
+              annotations:
+                repo_url: '{{ .metadata.annotations.repo_url }}'
+            rootAppSet:
+              enabled: '{{ eq (index .metadata.labels "addons") "self" }}'
+              repoURL: '{{ .metadata.annotations.repo_url }}'
+              targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+              groups: [addons]
+              project: addons
+              createProject: true
       # Wave 1: the locked default AppProject and the agent object.
       - path: charts/agent-registration
         helm:

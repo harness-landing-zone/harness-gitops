@@ -60,4 +60,5 @@ applicationSets:
               enabled: true
             annotations:
               repo_url: '{{ .metadata.annotations.repo_url }}'
+              repo_revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
               harness_account_id: '{{ .metadata.annotations.harness_account_id }}'

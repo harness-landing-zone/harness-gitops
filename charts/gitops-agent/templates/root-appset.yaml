@@ -17,7 +17,9 @@ are re-stamped, the ApplicationSets they track keep running). Argo runtime
 placeholders are backtick-escaped so they reach the appset controller
 literally. */}}
 {{- $as := (.Values).rootAppSet }}
-{{- if and $as $as.enabled .Values.gitopsAgent.enabled }}
+{{- /* enabled may arrive as the string "true" or "false" from an
+ApplicationSet template, so it is compared as text. */}}
+{{- if and $as (eq (toString $as.enabled) "true") .Values.gitopsAgent.enabled }}
 {{- $repoURL := default (.Values.gitSecret).url $as.repoURL }}
 {{- $revision := default "HEAD" $as.targetRevision }}
 {{- if not $repoURL }}
@@ -78,7 +80,9 @@ spec:
         repoURL: {{ $repoURL | quote }}
         revision: {{ $revision | quote }}
         files:
-          - path: {{ printf "%s/*.yaml" (default "groups" $as.groupsPath) | quote }}
+          {{- range (default (list "*") $as.groups) }}
+          - path: {{ printf "%s/%s.yaml" (default "groups" $as.groupsPath) . | quote }}
+          {{- end }}
   template:
     metadata:
       name: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
@@ -100,6 +104,7 @@ spec:
             valuesObject:
               group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
               revision: {{ $revision | quote }}
+              project: {{ default "default" $as.project | quote }}
       destination:
         namespace: {{ .Release.Namespace | quote }}
         name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
