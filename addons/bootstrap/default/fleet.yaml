@@ -1,0 +1,95 @@
+# The fleet catalogue: values for charts/application-sets, installed by
+# bootstrap/fleet.yaml. It registers every fleet member, as EKS Fleet
+# Management does: a cluster is a member because fleet-members/<cluster>.yaml
+# exists. The file name is the Argo CD cluster name and the cluster Secret
+# name; the file says how the cluster is bootstrapped (tenant, stage,
+# gitopsAgent, agentModel, harnessSecretName).
+#
+# For each file the entry below makes Application <cluster>-cluster on the hub
+# (charts/cluster-registration). ESO then creates that cluster Secret in
+# hga-hub-agent from OpenBao clusters/<cluster>. Only the connection (server,
+# CA, token) is in the store; the labels (tenant, stage, fleet_member) come
+# from git, and the other groups select on them.
+#
+# Removing a member file deletes nothing. Deleting the ExternalSecret deletes
+# the cluster Secret (creationPolicy Owner), so never delete it by hand for a
+# live spoke.
+
+namespace: hga-hub-agent
+
+# The hub only: one Application per member file, all on the hub.
+useSelectors: true
+globalSelectors:
+  fleet_member: hub-cluster
+
+# The values repo, read from the hub cluster Secret, as in addons.yaml.
+repoURLGit: '{{.metadata.annotations.repo_url}}'
+repoURLGitRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+repoURLGitBasePath: addons
+
+# No values ladder: the member file is the only values file (extraValueFiles).
+valueFiles: []
+useValuesFilePrefix: false
+
+project: default
+
+syncPolicyAppSet:
+  # Deleting an Application never deletes the ExternalSecret and with it the
+  # cluster Secret.
+  preserveResourcesOnDeletion: true
+  # Never delete a generated Application. Removing a cluster stays manual.
+  applicationsSync: create-update
+
+# As the Application bootstrap/cluster-registration.yaml made: no sync
+# options. null drops the chart's defaults.
+syncPolicy:
+  automated:
+    selfHeal: true
+    # Removing a cluster stays a deliberate act.
+    prune: false
+    allowEmpty: null
+  retry:
+    limit: 20
+    backoff:
+      duration: 1m
+      factor: null
+      maxDuration: null
+  syncOptions: null
+
+# GATE: enabled stays false until the old ApplicationSet cluster-registration
+# is deleted with --cascade=orphan; two sets must never generate one
+# Application.
+cluster-registration:
+  enabled: false
+  # The hub's cluster Secret (repo_url, harness_account_id) times one entry
+  # per member file.
+  gitMatrix: true
+  matrixPath: fleet-members/*.yaml
+  appSetName: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
+  labelsApp:
+    app.kubernetes.io/part-of: cluster-registration
+    cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+    # From the member file; "" when a file leaves them out.
+    tenant: '{{ default "" (index . "tenant") }}'
+    stage: '{{ default "" (index . "stage") }}'
+  # The hub, from the matrix.
+  namespace: hga-hub-agent
+  path: charts/cluster-registration
+  releaseName: '{{ trimSuffix ".yaml" .path.filename }}'
+  # The member file itself, as typed values (booleans stay booleans).
+  extraValueFiles:
+    - '$values/{{ .path.path }}/{{ .path.filename }}'
+  # Enforced over the member file. The cluster's name is the file name; the
+  # tenant is the file's own (the chart validates it).
+  valuesObject:
+    clusterName: '{{ trimSuffix ".yaml" .path.filename }}'
+    # Every member: only its ExternalSecret. The store is installed once, by
+    # the hub's openbao Application.
+    secretStore:
+      enabled: false
+      name: hub-openbao
+    externalSecret:
+      enabled: true
+    annotations:
+      repo_url: '{{ .metadata.annotations.repo_url }}'
+      harness_account_id: '{{ .metadata.annotations.harness_account_id }}'

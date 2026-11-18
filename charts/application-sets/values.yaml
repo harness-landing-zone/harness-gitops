@@ -26,3 +26,13 @@ valuesFilePrefix: '{{.metadata.labels.tenant}}/'
 # Argo CD AppProject of every generated Application; an entry's own project
 # wins. May be an Argo CD expression, e.g. '{{.metadata.labels.tenant}}'.
 project: default
+# Labels on every generated Application (unset: none). An entry's own
+# labelsApp replaces them.
+# labelsApp: {}
+#
+# Per entry, beside Fleet Management's keys:
+#   labelsApp        the generated Application's labels, replacing the
+#                    top-level labelsApp.
+#   extraValueFiles  value files added after the ladder, verbatim; may hold
+#                    Argo CD expressions, e.g. '$values/{{ .path.path }}/{{ .path.filename }}'
+#                    for a gitMatrix entry's own file.

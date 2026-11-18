@@ -1,0 +1,59 @@
+# Installer for the "fleet" group, a copy of bootstrap/addons.yaml. For the
+# hub cluster Secret (fleet_member: hub-cluster) it makes one Application,
+# <hub>-fleet, that installs charts/application-sets with the catalogue
+# addons/bootstrap/default/fleet.yaml: one ApplicationSet, cluster-registration,
+# which makes <cluster>-cluster on the hub for every fleet-members/ file.
+#
+# One revision: the hub cluster Secret's annotation repo_revision, HEAD when it
+# is missing.
+#
+# No metadata.namespace: the root Application applies this into the hub
+# agent's namespace. A generator that matches nothing still reports success,
+# so check with `kubectl get applications`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleet
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    # Deleting this installer leaves cluster-registration, and every cluster
+    # Secret, in place.
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: hub-cluster
+  template:
+    metadata:
+      name: '{{ .name }}-fleet'
+      labels:
+        app.kubernetes.io/part-of: fleet
+    spec:
+      project: default
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          path: charts/application-sets
+          helm:
+            releaseName: fleet
+            valueFiles:
+              - $values/addons/bootstrap/default/fleet.yaml
+      destination:
+        name: '{{ .name }}'
+        namespace: hga-hub-agent
+      syncPolicy:
+        automated:
+          selfHeal: true
+          # An entry removed from the catalogue leaves its ApplicationSet in
+          # place. Removing one stays a deliberate act.
+          prune: false
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m

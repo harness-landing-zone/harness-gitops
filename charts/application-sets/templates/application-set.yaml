@@ -104,7 +104,7 @@ spec:
       {{- else }}
       name: '{{ $nameNormalize }}-{{`{{ .name }}`}}'
       {{- end }}
-      {{- with $values.labelsApp }}
+      {{- with (default $values.labelsApp $chartConfig.labelsApp) }}
       labels:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -131,12 +131,17 @@ spec:
           valuesObject:
           {{- $chartConfig.valuesObject | toYaml | nindent 12 }}
           {{- end }}
-          {{- if $valueFiles }}
+          {{- if or $valueFiles $chartConfig.extraValueFiles }}
           valueFiles:
+          {{- if $valueFiles }}
           {{- include "application-sets.valueFiles" (dict 
             "nameNormalize" ($chartConfig.chartName | default $nameNormalize)
             "chartConfig" $chartConfig  
             "valueFiles" $valueFiles "values" $values) | nindent 12 }}
+          {{- end }}
+          {{- with $chartConfig.extraValueFiles }}
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- end }}
           {{- if $chartConfig.additionalResources}}
           {{ include "application-sets.additionalResources" (dict 

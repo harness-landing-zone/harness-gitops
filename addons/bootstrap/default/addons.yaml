@@ -9,11 +9,10 @@
 # The hub's Argo CD runs in hga-hub-agent; the ApplicationSets go there.
 namespace: hga-hub-agent
 
-# Every ApplicationSet selects the hub only, and each entry's enable_* label
-# on the hub cluster Secret switches that entry on.
+# Each entry selects its own clusters: the hub add-ons by their enable_* label
+# (only the hub cluster Secret carries one), the controller by the spoke
+# labels. No global selector, so an entry may reach spokes.
 useSelectors: true
-globalSelectors:
-  fleet_member: hub-cluster
 
 # The values repo, read from the hub cluster Secret: repo_url, and the
 # optional repo_revision (a branch, tag or commit; HEAD without it).
@@ -27,7 +26,9 @@ repoURLGitBasePath: addons
 #   addons/clusters/<cluster>/addons/<chart>/values.yaml
 valueFiles:
   - default/addons
-  - 'environments/{{ .metadata.labels.environment }}/addons'
+  # A cluster without an environment label (the spokes) reads the never
+  # existing environments/none/ instead of failing generation.
+  - 'environments/{{ default "none" (index .metadata.labels "environment") }}/addons'
   - clusters/{{.nameNormalized}}/addons
 # No tenant folders for the hub's add-ons.
 useValuesFilePrefix: false
@@ -39,8 +40,9 @@ useValuesFilePrefix: false
 # Another AppProject here needs its own mapping, or Harness does not list it.
 project: default
 
-# Labels on every generated Application. Harness indexes them only when an
-# Application is created, so change them only together with a handover.
+# Labels on every generated Application; an entry's own labelsApp replaces
+# them. Harness indexes them only when an Application is created, so change
+# them only together with a handover.
 labelsApp:
   app.kubernetes.io/part-of: hub-addons
 
@@ -55,11 +57,14 @@ syncPolicy:
   automated:
     selfHeal: true
     prune: false
-    allowEmpty: false
+    # null drops the chart's defaults, so the policy equals the rest of the repo.
+    allowEmpty: null
   retry:
     limit: 20
     backoff:
       duration: 1m
+      factor: null
+      maxDuration: null
   syncOptions:
     - CreateNamespace=true
     # The ESO and OpenBao CRDs exceed the client-side annotation limit.
@@ -102,3 +107,34 @@ openbao:
       - key: enable_openbao
         operator: In
         values: ['true']
+
+# The Harness GitOps controller on every self-managed spoke (v1 model):
+# Application <spoke>-controller, namespace hga-system, release hga-controller.
+# Selected by the labels the spoke already has: fleet_member spoke, a tenant
+# and a stage, and no agent_model hub. The key Secret harness-api-key-secret in
+# hga-system reaches the spoke separately (charts/cluster-registration push).
+# Name and labels equal the Application spoke-bootstrap/spoke-controller.yaml
+# made, which this entry takes over.
+#
+# GATE: enabled stays false until the old ApplicationSet spoke-controller is
+# deleted with --cascade=orphan; two sets must never generate one Application.
+hga-controller:
+  enabled: false
+  appSetName: '{{ .name }}-controller'
+  namespace: hga-system
+  path: charts/harness-gitops-agent-controller
+  releaseName: hga-controller
+  labelsApp:
+    app.kubernetes.io/part-of: spoke-bootstrap
+    cluster: '{{ .name }}'
+    tenant: '{{ .metadata.labels.tenant }}'
+    stage: '{{ .metadata.labels.stage }}'
+    role: controller
+  selectorMatchLabels:
+    fleet_member: spoke
+  selector:
+    matchExpressions:
+      - {key: tenant, operator: Exists}
+      - {key: stage, operator: Exists}
+      # A missing label counts as not hub, so today's spokes match.
+      - {key: agent_model, operator: NotIn, values: [hub]}
