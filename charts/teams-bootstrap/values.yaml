@@ -1,6 +1,5 @@
-# Required, set by bootstrap/agent-registration.yaml (hub-managed) or
-# spoke-bootstrap/spoke-teams.yaml: the HarnessGitopsAgent (in this namespace)
-# every mapping points at.
+# Required. The agent-registration and spoke-teams entries in groups/agents.yaml
+# set the name of the HarnessGitopsAgent that every mapping points at.
 agentName: ""
 
 # all (default; a self-managed spoke): namespaces, AppProject and mapping here.

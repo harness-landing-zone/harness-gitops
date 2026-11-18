@@ -1,8 +1,8 @@
 # People and ownership
 
-> The text of this page matches the repository at commit `0b56780`.
-> [Architecture](architecture.md) is the full description. **The diagram is
-> outdated**: it shows the state of 2026-11-13 and has not been redrawn.
+> This page records the workshop at commit `0b56780`. The diagram records the
+> state of 2026-11-13. See [Architecture](architecture.md) for the grouped
+> bootstrap and current repository layout.
 
 > Status words used on this page: **proven** means run on the local test
 > clusters; **built** means in the repo but not run; **open** means not

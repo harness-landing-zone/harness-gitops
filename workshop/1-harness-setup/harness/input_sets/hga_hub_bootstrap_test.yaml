@@ -9,6 +9,9 @@ inputSet:
   pipeline:
     identifier: hga_hub_bootstrap
     variables:
+      - name: git_ref
+        type: String
+        value: main
       - name: image_tag
         type: String
         value: v0.1.0

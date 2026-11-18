@@ -54,7 +54,10 @@ tofu apply
 1. Install the delegate in the hub cluster: `tofu output -raw delegate_install_command`
    prints the `helm upgrade -i` command; it reads the token with
    `tofu output -raw delegate_token`, so run it from this folder.
-2. When the delegate is connected, run the `hga_hub_bootstrap` pipeline.
+2. When the delegate is connected, run the `hga_hub_bootstrap` pipeline with
+   input set `hga_hub_bootstrap_test`. It selects `main` by default. For the
+   grouped test, set `git_ref` to `workshop-appsets-groups` after selecting the
+   input set in the Run Pipeline dialog. See the [hub bootstrap instructions](../../README.md#from-zero-to-a-hub).
 
 ## State holds secrets
 

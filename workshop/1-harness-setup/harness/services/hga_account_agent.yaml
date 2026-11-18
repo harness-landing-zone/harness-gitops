@@ -21,7 +21,7 @@ service:
                   gitFetchType: Branch
                   folderPath: charts/gitops-agent
                   repoName: harness-gitops
-                  branch: main
+                  branch: <+pipeline.variables.git_ref>
               valuesPaths:
                 - hub/account-agent.yaml
               skipResourceVersioning: false

@@ -5,7 +5,7 @@ description: >-
   fences it and its Harness project mapping. For a hub-managed spoke the
   mapping (with a deny-all placeholder AppProject) is on the hub and the rest
   on the spoke.
-  Separate from the agent (charts/fleet-member-registration), so teams change
+  Separate from the agent (charts/agent-registration), so teams change
   on their own lifecycle.
 type: application
 version: 0.1.0

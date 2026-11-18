@@ -7,6 +7,11 @@ pipeline:
   tags:
     purpose: platform-cd
   variables:
+    - name: git_ref
+      type: String
+      description: Git branch for the Helm services and the hub's GitOps bootstrap.
+      required: true
+      value: <+input>.default(main).allowedValues(main,workshop-appsets-groups)
     - name: image_tag
       type: String
       description: Tag of harness/gitops-agent-bootstrap-controller on Docker Hub, for example v0.1.0. Read by hub/controller.yaml.

@@ -29,8 +29,10 @@ tofu workspace select -or-create hub && tofu apply
 ```
 
 Then run pipeline `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`.
-The hub's Argo CD then installs OpenBao (`bootstrap/hub-openbao.yaml`), which
-the spokes write into, so wait for pod `openbao-0` before adding a spoke.
+The [hub bootstrap instructions](../../README.md#from-zero-to-a-hub) explain
+how to select `workshop-appsets-groups` for the grouped test. The hub's Argo CD
+installs OpenBao from `groups/addons.yaml`. Wait for pod `openbao-0` before
+adding a spoke.
 
 For each spoke, add `cluster-values/<spoke>.yaml` (see `spoke-test.yaml`), then:
 

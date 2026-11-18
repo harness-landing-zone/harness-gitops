@@ -18,7 +18,7 @@ apiKeySecret:
   value: '<+secrets.getValue("HGA-Token")>'
   # One org-scoped key per tenant (here bu1). The agent objects of that
   # tenant's hub-managed spokes name it in spec.apiKeySecretRef
-  # (harness-api-key-TENANT, set by bootstrap/agent-registration.yaml).
+  # (harness-api-key-TENANT, set by the agents group).
   extra:
     harness-api-key-bu1: '<+secrets.getValue("hga_controller_bu1_token")>'
 
@@ -34,9 +34,8 @@ gitSecret:
   credsTemplate: true
   githubAppJson: '<+secrets.getValue("hga_github_app")>'
 
-# The hub cluster Secret is the only per-hub input. Every ApplicationSet under
-# bootstrap/ selects on fleet_member and reads the rest from here. The
-# environment is whichever Harness Environment the pipeline was run against.
+# The group installer selects the hub by fleet_member and reads its repository
+# settings from these annotations. The environment labels follow the pipeline.
 hubCluster:
   enabled: true
   labels:
@@ -44,11 +43,13 @@ hubCluster:
     harness_env_ref: <+env.identifier>
   annotations:
     repo_url: <+serviceVariables.repo_url>
+    repo_revision: '<+pipeline.variables.git_ref>'
     harness_account_id: <+account.identifier>
 
 rootAppSet:
   enabled: true
   path: bootstrap
+  targetRevision: '<+pipeline.variables.git_ref>'
   project: default
   # Creates AppProject default as a hook, see gitopsAgent.appProject below.
   createProject: true
