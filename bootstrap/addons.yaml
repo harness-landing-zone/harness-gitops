@@ -1,0 +1,65 @@
+# Installer for the "addons" group, as EKS Fleet Management's
+# fleet/bootstrap/addonsv2.yaml (commit 5a40438). For the hub cluster Secret
+# (fleet_member: hub-cluster) it makes one Application, <hub>-addons, that
+# installs charts/application-sets with the group's catalogue
+# addons/bootstrap/default/addons.yaml. The chart renders one ApplicationSet
+# per catalogue entry (external-secrets, openbao); each makes its add-on's
+# Application <hub>-<add-on> once the hub cluster Secret carries that entry's
+# enable_<add-on>: "true" label.
+#
+# Another group is a copy of this file with the group name changed, plus its
+# catalogue addons/bootstrap/default/<group>.yaml.
+#
+# One revision: the hub cluster Secret's annotation repo_revision, HEAD when it
+# is missing.
+#
+# No metadata.namespace: the root Application applies this into the hub
+# agent's namespace. A generator that matches nothing still reports success,
+# so check with `kubectl get applications`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addons
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    # Deleting this installer leaves the add-on ApplicationSets, and what they
+    # deployed, running.
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: hub-cluster
+  template:
+    metadata:
+      name: '{{ .name }}-addons'
+      labels:
+        app.kubernetes.io/part-of: hub-addons
+    spec:
+      project: default
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          path: charts/application-sets
+          helm:
+            releaseName: addons
+            valueFiles:
+              - $values/addons/bootstrap/default/addons.yaml
+      destination:
+        name: '{{ .name }}'
+        namespace: hga-hub-agent
+      syncPolicy:
+        automated:
+          selfHeal: true
+          # An entry removed from the catalogue leaves its ApplicationSet, and
+          # with it the add-on, in place. Removing one stays a deliberate act.
+          prune: false
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m

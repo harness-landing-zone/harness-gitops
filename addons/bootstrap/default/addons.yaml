@@ -1,0 +1,104 @@
+# The addons catalogue: values for charts/application-sets, which renders one
+# ApplicationSet per enabled entry. The installer bootstrap/addons.yaml passes
+# this file to the chart (EKS Fleet Management style, commit 5a40438).
+#
+# Harness indexes an Application's labels only when it is created, and
+# renaming an Application creates a new one beside the old. Change appSetName
+# only together with a handover.
+
+# The hub's Argo CD runs in hga-hub-agent; the ApplicationSets go there.
+namespace: hga-hub-agent
+
+# Every ApplicationSet selects the hub only, and each entry's enable_* label
+# on the hub cluster Secret switches that entry on.
+useSelectors: true
+globalSelectors:
+  fleet_member: hub-cluster
+
+# The values repo, read from the hub cluster Secret: repo_url, and the
+# optional repo_revision (a branch, tag or commit; HEAD without it).
+repoURLGit: '{{.metadata.annotations.repo_url}}'
+repoURLGitRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+repoURLGitBasePath: addons
+
+# The values ladder, most general first; a later file wins, any may be missing:
+#   addons/default/addons/<chart>/values.yaml
+#   addons/environments/<environment>/addons/<chart>/values.yaml
+#   addons/clusters/<cluster>/addons/<chart>/values.yaml
+valueFiles:
+  - default/addons
+  - 'environments/{{ .metadata.labels.environment }}/addons'
+  - clusters/{{.nameNormalized}}/addons
+# No tenant folders for the hub's add-ons.
+useValuesFilePrefix: false
+
+# The Argo CD AppProject of every add-on Application (an entry may set its
+# own project). In Harness the AppProject decides the project an Application
+# is listed under: the controller's project mapping pairs AppProject default
+# with the hub's admin project (mapping hub-admin, hub/account-agent.yaml).
+# Another AppProject here needs its own mapping, or Harness does not list it.
+project: default
+
+# Labels on every generated Application. Harness indexes them only when an
+# Application is created, so change them only together with a handover.
+labelsApp:
+  app.kubernetes.io/part-of: hub-addons
+
+syncPolicyAppSet:
+  # Deleting an ApplicationSet leaves the add-on running.
+  preserveResourcesOnDeletion: true
+  # Never delete a generated Application. Removing an add-on stays manual.
+  applicationsSync: create-update
+
+# Every Application's sync policy, as the rest of this repo.
+syncPolicy:
+  automated:
+    selfHeal: true
+    prune: false
+    allowEmpty: false
+  retry:
+    limit: 20
+    backoff:
+      duration: 1m
+  syncOptions:
+    - CreateNamespace=true
+    # The ESO and OpenBao CRDs exceed the client-side annotation limit.
+    - ServerSideApply=true
+
+external-secrets:
+  enabled: true
+  appSetName: '{{ .name }}-external-secrets'
+  namespace: external-secrets
+  chartRepository: https://charts.external-secrets.io
+  defaultVersion: "2.15.0"
+  selector:
+    matchExpressions:
+      - key: enable_external_secrets
+        operator: In
+        values: ['true']
+
+# OpenBao plus, in the same Application, the ClusterSecretStore hub-openbao
+# through which ESO reads it (charts/cluster-registration with the store on,
+# release <hub>-openbao-store, values in openbao/secret-store/). The store
+# retries until ESO's CRDs exist.
+openbao:
+  enabled: true
+  appSetName: '{{ .name }}-openbao'
+  namespace: openbao
+  chartRepository: https://openbao.github.io/openbao-helm
+  defaultVersion: "0.30.7"
+  additionalResources:
+    path: charts/cluster-registration
+    type: secret-store
+    helm:
+      releaseName: openbao-store
+      valuesObject:
+        secretStore:
+          enabled: true
+        externalSecret:
+          enabled: false
+  selector:
+    matchExpressions:
+      - key: enable_openbao
+        operator: In
+        values: ['true']
