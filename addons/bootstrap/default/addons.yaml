@@ -113,13 +113,11 @@ openbao:
 # Selected by the labels the spoke already has: fleet_member spoke, a tenant
 # and a stage, and no agent_model hub. The key Secret harness-api-key-secret in
 # hga-system reaches the spoke separately (charts/cluster-registration push).
-# Name and labels equal the Application spoke-bootstrap/spoke-controller.yaml
-# made, which this entry takes over.
-#
-# GATE: enabled stays false until the old ApplicationSet spoke-controller is
-# deleted with --cascade=orphan; two sets must never generate one Application.
-hga-controller:
-  enabled: false
+# The entry's name is the ApplicationSet's: spoke-controller, the one
+# spoke-bootstrap/spoke-controller.yaml made, taken over in place (same object,
+# same Applications). Application name and labels are unchanged too.
+spoke-controller:
+  enabled: true
   appSetName: '{{ .name }}-controller'
   namespace: hga-system
   path: charts/harness-gitops-agent-controller

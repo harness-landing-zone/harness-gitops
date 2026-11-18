@@ -56,11 +56,11 @@ syncPolicy:
       maxDuration: null
   syncOptions: null
 
-# GATE: enabled stays false until the old ApplicationSet cluster-registration
-# is deleted with --cascade=orphan; two sets must never generate one
-# Application.
+# The entry's name is the ApplicationSet's: cluster-registration, the one
+# bootstrap/cluster-registration.yaml made, taken over in place (same object,
+# same Applications).
 cluster-registration:
-  enabled: false
+  enabled: true
   # The hub's cluster Secret (repo_url, harness_account_id) times one entry
   # per member file.
   gitMatrix: true
