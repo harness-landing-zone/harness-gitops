@@ -67,7 +67,7 @@ charts/
   agent-registration          the agent object and the locked default AppProject
   teams-bootstrap             per team: namespaces, AppProject, mapping
 hub/                values for the Day 0 pipeline: controller.yaml, account-agent.yaml
-addons/hub/defaults/openbao/values.yaml   values for OpenBao, the hub's only add-on with a values file
+addons/defaults/openbao/values.yaml       values for OpenBao, the only add-on with a values file
 workshop/README.md            local workshop and verification
 workshop/1-harness-setup/     OpenTofu for shared Harness entities and the pipeline YAML
 workshop/2-clusters/          OpenTofu and k3d.sh: the test clusters, the delegate,

@@ -23,6 +23,10 @@ stage: ""
 # group in groups/agents.yaml installs an agent) or push (registered only; the
 # hub's Argo CD deploys to it). Every member gets fleet_member: spoke.
 model: ""
+# From the member file: extra labels for the cluster Secret. An add-on's
+# switch goes here, for example enable_external_secrets: "true"
+# (groups/addons.yaml). The labels the chart sets itself are refused.
+labels: {}
 # The fleet group in groups/fleet.yaml copies repo_url and harness_account_id
 # from the hub cluster Secret.
 annotations: {}

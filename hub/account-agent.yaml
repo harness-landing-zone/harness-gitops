@@ -41,6 +41,9 @@ hubCluster:
   labels:
     environment: <+env.identifier>
     harness_env_ref: <+env.identifier>
+    # The add-ons this hub runs (groups/addons.yaml selects on these).
+    enable_external_secrets: "true"
+    enable_openbao: "true"
   annotations:
     repo_url: <+serviceVariables.repo_url>
     repo_revision: '<+pipeline.variables.git_ref>'

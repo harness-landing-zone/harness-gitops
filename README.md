@@ -58,7 +58,7 @@ charts/             application-sets, the official controller chart, gitops-agen
                     (wraps the official gitops-helm), cluster-registration,
                     agent-registration, teams-bootstrap
 hub/                values for the Day 0 pipeline
-addons/hub/         values for the hub's add-ons (OpenBao)
+addons/defaults/    values for the add-ons (OpenBao); addons/clusters/<cluster>/ per cluster
 workshop/README.md         local workshop and verification
 workshop/1-harness-setup/   OpenTofu for shared Harness entities and the pipeline
 workshop/2-clusters/        OpenTofu and k3d.sh for the local test clusters
