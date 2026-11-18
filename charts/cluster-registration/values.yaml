@@ -23,6 +23,10 @@ stage: ""
 # group in groups/agents.yaml installs an agent) or push (registered only; the
 # hub's Argo CD deploys to it). Every member gets fleet_member: spoke.
 model: ""
+# From the member file, stamped as label addons: who installs this cluster's
+# add-ons. hub (the default): the hub's Argo CD pushes them. self: the
+# cluster's own Argo CD installs them; refused until that side is built.
+addons: hub
 # From the member file: extra labels for the cluster Secret. An add-on's
 # switch goes here, for example enable_external_secrets: "true"
 # (groups/addons.yaml). The labels the chart sets itself are refused.

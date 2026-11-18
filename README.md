@@ -96,6 +96,7 @@ pipeline's `git_ref`.
    tenant: bu1        # the Harness org
    stage: test        # which values and teams it gets
    model: agent       # install an agent (push: registered only)
+   addons: hub        # the hub pushes this cluster's add-ons
    harnessSecretName: harness-api-keys/<cluster>   # the key the hub pushes
    ```
 

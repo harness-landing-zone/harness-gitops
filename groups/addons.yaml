@@ -7,6 +7,9 @@
 # hubCluster.labels in hub/account-agent.yaml; a spoke's are labels in its
 # fleet-members file. No switch, no add-on.
 #
+# The hub pushes an add-on to every cluster that has its switch, except a
+# cluster labelled addons: self, which installs its own (not built yet).
+#
 # Harness indexes an Application's labels only when it is created, and
 # renaming an Application creates a new one beside the old. Change a name or a
 # label only together with a handover.
@@ -27,6 +30,8 @@ applicationSets:
     selector:
       matchLabels:
         enable_external_secrets: "true"
+      matchExpressions:
+        - {key: addons, operator: NotIn, values: [self]}
     name: '{{ .name }}-external-secrets'
     destination:
       namespace: external-secrets
@@ -53,6 +58,8 @@ applicationSets:
     selector:
       matchLabels:
         enable_openbao: "true"
+      matchExpressions:
+        - {key: addons, operator: NotIn, values: [self]}
     name: '{{ .name }}-openbao'
     destination:
       namespace: openbao
