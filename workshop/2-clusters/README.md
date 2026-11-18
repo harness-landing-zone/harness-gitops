@@ -1,64 +1,58 @@
 # 2. Clusters
 
-Local k3d clusters, one OpenTofu workspace each: the workspace name is the
-cluster name, and `cluster-values/<name>.yaml` says what it is (`role: hub` or
-`role: spoke`). OpenTofu runs `k3d.sh` for the cluster work and makes the
-Harness side.
+Start with the [workshop guide](../README.md) for setup and verification.
+This stage provisions local k3d clusters. Each OpenTofu workspace uses the
+configuration in `cluster-values/<workspace>.yaml`.
 
-- **hub**: k3d cluster `hga-hub` and the Harness delegate (its token comes from
-  `../1-harness-setup`).
-- **spoke-&lt;name&gt;**: k3d cluster `hga-spoke-<name>`, its connection in OpenBao
-  on the hub (`clusters/<name>`), and its own Harness API key, scoped to its
-  business unit's org, in OpenBao at its `harnessSecretName` (default
-  `harness-api-keys/<name>`; `tofu output harness_secret_name` shows it). The
-  member file `fleet-members/<name>.yaml` names the same path, and the hub
-  pushes the key to the spoke.
+- The `hub` workspace creates k3d cluster `hga-hub` (context
+  `k3d-hga-hub`). It installs the delegate using the token and name from the
+  default workspace's local state in `../1-harness-setup/terraform.tfstate`.
+  The Harness setup variable `hub_delegate_name` defaults to `hga-test-hub`.
+- Each spoke workspace creates a k3d cluster and a tenant-scoped Harness API
+  key. For `spoke-test`, the cluster is `hga-spoke-test` (context
+  `k3d-hga-spoke-test`) and its connection details go to
+  `clusters/spoke-test` in the hub's OpenBao. The key goes to
+  `harness-api-keys/spoke-test` by default. The member file's
+  `harnessSecretName` must match the key path used by the workspace.
 
-## What you need first
+Use the same `HARNESS_ACCOUNT_ID` and `HARNESS_PLATFORM_API_KEY` as Stage 1.
+For an existing workshop hub using the Helm release `local-hub-delegate`,
+set `hub_delegate_name = "local-hub-delegate"` in the Stage 1
+`terraform.tfvars` and reapply Stage 1 first. Stage 2 will reuse that release.
+Create the hub and run its bootstrap pipeline before applying any spoke
+workspace. A spoke needs OpenBao running on the hub to store its connection
+and API key. The grouped branch already contains the `spoke-test` member file.
 
-- `../1-harness-setup` applied.
-- The same Harness credentials in the environment as there
-  (`HARNESS_ACCOUNT_ID`, `HARNESS_PLATFORM_API_KEY`).
-- docker, k3d, kubectl, helm and jq.
+## Destroy the local infrastructure
 
-## Up
+Complete remote offboarding while the controllers and their credentials are
+still available. Confirm the workshop agent registrations and their project
+mappings have been cleaned up in Harness. From `workshop/2-clusters`, review
+and destroy each workshop spoke workspace. For the default workshop spoke,
+run the following.
 
 ```bash
-tofu init
-tofu workspace select -or-create hub && tofu apply
+tofu workspace select spoke-test && tofu destroy
 ```
 
-Then run pipeline `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`.
-The [hub bootstrap instructions](../../README.md#from-zero-to-a-hub) explain
-how to select `workshop-appsets-groups` for the grouped test. The hub's Argo CD
-installs OpenBao from `groups/addons.yaml`. Wait for pod `openbao-0` before
-adding a spoke.
-
-For each spoke, add `cluster-values/<spoke>.yaml` (see `spoke-test.yaml`), then:
+Once all workshop spoke destroys have succeeded, review and destroy the hub
+workspace.
 
 ```bash
-tofu workspace select -or-create <spoke> && tofu apply
-```
-
-Registering the spoke in GitOps is a commit: add `fleet-members/<spoke>.yaml`
-and push.
-
-## Down
-
-Every spoke workspace first, then the hub:
-
-```bash
-tofu workspace select <spoke> && tofu destroy
 tofu workspace select hub && tofu destroy
 ```
 
 ## After a hub restart
 
-The dev-mode OpenBao forgets everything. Write it again:
+OpenBao runs in dev mode and loses its entries on restart. In
+`workshop/2-clusters`, restore every local spoke connection and then restore
+each key from its workspace. For the default workshop spoke, run the following
+after the OpenBao pod is Ready.
 
 ```bash
+kubectl --context k3d-hga-hub -n openbao wait --for=condition=Ready pod/openbao-0 --timeout=120s
 ./k3d.sh register
-tofu workspace select <spoke> && tofu apply -replace='terraform_data.spoke_key[0]'   # per spoke
+tofu workspace select spoke-test && tofu apply -replace='terraform_data.spoke_key[0]'
 ```
 
 ## State holds secrets

@@ -28,7 +28,7 @@ variable "controller_token_secret_id" {
 }
 
 variable "github_org" {
-  description = "GitHub organization that owns the repo."
+  description = "GitHub organization or user that owns the harness-gitops repository."
   type        = string
   default     = "harness-landing-zone"
 }

@@ -2,6 +2,8 @@
 
 This document describes the grouped bootstrap on this branch. Its [live]
 marks refer to workshop runs of the earlier layout on `main`.
+Use the [workshop guide](../workshop/README.md) to run the grouped bootstrap
+on local k3d clusters.
 
 It is written for a reader with no context, and for reviewers looking for
 gaps. Every statement about the build carries one of four marks:
@@ -9,7 +11,7 @@ gaps. Every statement about the build carries one of four marks:
 | Mark | Meaning |
 |---|---|
 | **[live]** | Run on the earlier local k3d setup with hub `hga-hub` and spoke `spoke-test`. A statement about an earlier spoke says so. |
-| **[built]** | In the repository, with live validation pending. The grouped bootstrap has offline checks. |
+| **[built]** | In the repository, with live validation pending. The grouped bootstrap has been rendered locally with Helm. |
 | **[decided]** | Decided, not built. |
 | **[theory]** | Reasoning only. |
 
@@ -72,7 +74,8 @@ charts/
   teams-bootstrap             per team: namespaces, AppProject, mapping
 hub/                values for the Day 0 pipeline: controller.yaml, account-agent.yaml
 addons/hub/defaults/openbao/values.yaml   values for OpenBao, the hub's only add-on with a values file
-workshop/1-harness-setup/     OpenTofu for every Harness entity, and the pipeline YAML
+workshop/README.md            local workshop and verification
+workshop/1-harness-setup/     OpenTofu for shared Harness entities and the pipeline YAML
 workshop/2-clusters/          OpenTofu and k3d.sh: the test clusters, the delegate,
                               and each spoke's connection and API key in the store
 docs/               this document, an older page on people and ownership, diagrams
@@ -115,13 +118,13 @@ Caveats that apply to the design, not to a missing step:
 
 | # | Who | Does what | Where | Mark |
 |---|---|---|---|---|
-| 1 | A person | Creates and installs a GitHub App for the repo and saves its private key. Has a Harness account and a personal access token. | GitHub, Harness | [live] |
+| 1 | A person | Makes the grouped branch available in the GitHub repository, installs a GitHub App for that repo, and saves its private key. Uses a test Harness account and a personal access token. | GitHub, Harness | [built] for the grouped branch. The GitHub App was used in earlier runs. |
 | 2 | A person, OpenTofu | `tofu apply` in `workshop/1-harness-setup/`. Creates the platform org and project, the account-level role, service account and API key for the controller, the Harness secrets, the GitHub and Kubernetes connectors, a delegate token, and the environment, infrastructures, services, pipeline and input set. | Harness | [live] |
 | 3 | Same apply | Per tenant (`business-units.tf`, only `bu1`): the org, one project per team (`team_a`, `team_b`), and an org-level role, service account, API key and token. | Harness | [live] |
-| 4 | A person, OpenTofu | `tofu apply` in workspace `hub` of `workshop/2-clusters/`. Creates the k3d cluster `hga-hub` and installs a Harness delegate on it with the delegate token from step 2. | Laptop, hub | [built]. The running hub and its delegate were made by hand before this folder existed. |
-| 5 | A person | Pushes `workshop-appsets-groups` to GitHub. The `hga_hub_bootstrap_test` input set fills `git_ref` with `main`. For the grouped test, select `workshop-appsets-groups` in the run dialog. | GitHub, Harness | [built] |
+| 4 | A person, OpenTofu | `tofu apply` in workspace `hub` of `workshop/2-clusters/`. Creates the k3d cluster `hga-hub` and installs the Harness delegate using its name and token from the local state in step 2. | Laptop, hub | [built]. The earlier hub and its delegate were made by hand. |
+| 5 | A person | Confirms that the hub delegate is connected, then runs `hga_hub_bootstrap` with the `hga_hub_bootstrap_test` input set. The input set fills `git_ref` with `main`. Select `workshop-appsets-groups` in the run dialog for the grouped test. | Harness | [built] |
 | 6 | Pipeline `hga_hub_bootstrap`, stage 1 | Installs the controller and its CRDs into `hga-system` (`hub/controller.yaml`). | Hub | [live] |
-| 7 | Pipeline, stage 2 | Installs `charts/gitops-agent` into `hga-hub-agent` (`hub/account-agent.yaml`): Argo CD, the hub agent and its agent object, one mapping, the API key Secrets in `hga-system`, the repo credential, the cluster Secret `hub-cluster`, and the root ApplicationSet. | Hub | [live] |
+| 7 | Pipeline, stage 2 | Installs `charts/gitops-agent` into `hga-hub-agent` (`hub/account-agent.yaml`): Argo CD, the hub agent and its agent object, one mapping, the API key Secrets in `hga-system`, the repo credential, the cluster Secret `hub-cluster`, and the root Application. | Hub | [live] |
 | 8 | Controller | Registers the hub agent in Harness and writes its token. The agent connects. The pipeline's last step waits for that. | Hub, Harness | [live] |
 | 9 | Hub Argo CD | The root Application `cluster-application-sets` applies `bootstrap/groups.yaml` from `git_ref`. The `groups` ApplicationSet creates three Applications: `hub-cluster-addons`, `hub-cluster-fleet` and `hub-cluster-agents`. | Hub | [built] |
 | 10 | Hub Argo CD | Each group Application renders `charts/application-sets` with its `groups/<group>.yaml` values from the same branch. The addons group installs ESO, OpenBao and its store. | Hub | [built] |
@@ -145,7 +148,7 @@ The fleet group waits for member files and the corresponding OpenBao entries.
   live validation.** The historical runs upgraded an earlier install. With
   pruning disabled, the old `hub-cluster-spokes` Application can remain and
   track the same spoke ApplicationSets as the new group Application. Start on
-  an empty hub and follow the [workshop checkpoints](../README.md#from-zero-to-a-hub).
+  an empty hub and follow the [workshop guide](../workshop/README.md).
 
 ## Part 2. Onboarding a cluster with an agent
 
@@ -253,8 +256,7 @@ resources and every resource in the `gitops.harness.io` group.
 - **Nothing is deleted automatically.** No ApplicationSet prunes. Removing a
   member file or a team file leaves everything in place. Agent objects and
   mappings carry `Delete=false`, because deleting one deregisters it in
-  Harness. Offboarding is a manual sequence that is not written down in this
-  repository. [live]
+  Harness. Offboarding is manual. [live]
 - **A removed spoke's member file goes to `decommissioned/`, not to a
   subfolder of `fleet-members/`.** The generator's pattern
   `fleet-members/*.yaml` also matched files in a subfolder. [live]
@@ -300,8 +302,7 @@ Kept simple on purpose. None of this is planned work yet.
 2. Moving a running spoke from self-managed to hub-managed.
 3. Grouped bootstrap on an empty hub, a repeat run and migration from the
    earlier layout.
-4. The `hub` workspace of `workshop/2-clusters` (cluster and delegate), and
-   the delegate install command `workshop/1-harness-setup` prints.
+4. The `hub` workspace of `workshop/2-clusters` (cluster and delegate).
 5. Any upgrade of Argo CD, the agent or the controller on a spoke.
 6. Offboarding a team or a tenant. Spokes have been removed by hand.
 7. A second tenant (`tenants/bu2/` is empty), a second stage running beside
@@ -341,10 +342,6 @@ These are files that say or do something the build no longer matches.
 - `workshop/1-harness-setup/k3d.sh` is an older copy of the cluster script.
   Its `register` reads an OpenTofu output `spoke_api_keys` that no file
   defines. `workshop/2-clusters/k3d.sh` is the one OpenTofu runs.
-- `workshop/1-harness-setup/README.md` does not mention the per-tenant
-  entities that `business-units.tf` creates, and tells the reader to install
-  the delegate by hand, which the `hub` workspace of `workshop/2-clusters`
-  also does.
 - `workshop/2-clusters/cluster-values/*.yaml` names the tenant `bu`; member
   files name it `tenant`.
 - `tenants/bu1/gitops-agents/nonprod/values.yaml` applies to no fleet member:

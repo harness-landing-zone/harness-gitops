@@ -9,4 +9,4 @@ environment:
     - name: delegate_selector
       type: String
       description: Delegate inside this hub cluster, where the verify step runs. OpenTofu sets it from hub_delegate_name, the delegate the Kubernetes connector selects.
-      value: local-hub-delegate
+      value: hga-test-hub

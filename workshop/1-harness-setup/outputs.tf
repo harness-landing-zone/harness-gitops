@@ -1,3 +1,8 @@
+output "hub_delegate_name" {
+  description = "Name of the delegate selected by the hub connector and bootstrap pipeline."
+  value       = var.hub_delegate_name
+}
+
 output "delegate_token" {
   description = "Delegate token for the hub delegate. Read with: tofu output -raw delegate_token"
   value       = harness_platform_delegatetoken.hub.value
@@ -5,7 +10,7 @@ output "delegate_token" {
 }
 
 output "delegate_install_command" {
-  description = "Installs the hub delegate. Replace the token placeholder before running."
+  description = "Helm commands to install the hub delegate from this setup directory."
   value       = <<-EOT
     helm repo add harness-delegate https://app.harness.io/storage/harness-download/delegate-helm-chart/
     helm repo update harness-delegate

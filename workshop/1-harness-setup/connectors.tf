@@ -1,9 +1,13 @@
+locals {
+  github_owner_url = "https://github.com/${var.github_org}"
+}
+
 resource "harness_platform_connector_github" "this" {
   identifier      = "hga_github"
   name            = "hga_github"
   org_id          = local.project_scope.org_id
   project_id      = local.project_scope.project_id
-  url             = "https://github.com/${var.github_org}"
+  url             = local.github_owner_url
   connection_type = "Account"
   validation_repo = "harness-gitops"
 

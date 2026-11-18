@@ -1,5 +1,2 @@
 # The hub: workspace hub. Made by k3d.sh hub, plus the Harness delegate.
 role: hub
-# Must equal hub_delegate_name in ../1-harness-setup: the Kubernetes connector
-# selects the delegate by this name.
-delegateName: local-hub-delegate

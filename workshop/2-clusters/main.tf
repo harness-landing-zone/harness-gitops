@@ -3,12 +3,11 @@
 # (the default workspace has none). k3d.sh does the cluster work; this decides
 # what to run and holds the Harness side.
 locals {
-  values = yamldecode(file("${path.module}/cluster-values/${terraform.workspace}.yaml"))
-  name   = terraform.workspace
-  role   = try(local.values.role, "")
-  bu     = try(local.values.bu, "")
-  # Only the hub has one. try(): validate reads it in every workspace.
-  delegate = try(local.values.delegateName, "")
+  values   = yamldecode(file("${path.module}/cluster-values/${terraform.workspace}.yaml"))
+  name     = terraform.workspace
+  role     = try(local.values.role, "")
+  bu       = try(local.values.bu, "")
+  delegate = local.role == "hub" ? data.terraform_remote_state.setup[0].outputs.hub_delegate_name : ""
   script   = abspath("${path.module}/k3d.sh")
   # The spoke's own Harness identity.
   id = "hga_agent_${replace(local.name, "-", "_")}"
@@ -31,7 +30,7 @@ resource "terraform_data" "values" {
     }
     precondition {
       condition     = local.role != "hub" || can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", local.delegate))
-      error_message = "cluster-values/hub.yaml: delegateName must be a DNS label."
+      error_message = "hub_delegate_name from ../1-harness-setup must be a DNS label."
     }
     precondition {
       condition     = local.role != "spoke" || can(regex("^spoke-[a-z0-9]([-a-z0-9]*[a-z0-9])?$", local.name))
@@ -71,7 +70,7 @@ resource "terraform_data" "hub_cluster" {
   depends_on = [terraform_data.values]
 }
 
-# The delegate token comes from ../1-harness-setup, which made it.
+# Read the name the connector selects and its token from ../1-harness-setup.
 data "terraform_remote_state" "setup" {
   count   = local.role == "hub" ? 1 : 0
   backend = "local"

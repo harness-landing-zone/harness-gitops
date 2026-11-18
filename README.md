@@ -8,19 +8,19 @@ One account-level agent on a **hub** cluster deploys an agent onto every
 **spoke** cluster, from files in this repo. Adding a cluster is one member
 file. Adding a team is one team file.
 
-**[docs/architecture.md](docs/architecture.md) is the full description**: who
-holds what, every step from an empty machine, what has run and what has not,
-and the open questions. This README is the short version.
+Start with the **[local workshop](workshop/README.md)** to set up a test
+Harness project, bootstrap a k3d hub, and verify a spoke. For resource flow,
+ownership and validation history, see the [architecture](docs/architecture.md).
 
 ## Status
 
 Previous workshop runs used one local k3d hub and one spoke, `spoke-test`.
-This branch's grouped bootstrap has offline checks, with live validation pending.
+The grouped bootstrap has been rendered locally with Helm. Live validation is pending.
 Two models exist for a spoke's agent:
 
 | Model | Member file | Where the controller and the Harness API key are | State |
 |---|---|---|---|
-| Self-managed | `agentModel: ""` | On the hub and on every spoke. Each spoke has its own key, which the hub pushes to it. | Running on `spoke-test` |
+| Self-managed | `agentModel: ""` | On the hub and on every spoke. Each spoke has its own key, which the hub pushes to it. | Ran on `spoke-test` in the earlier workshop |
 | Hub-managed | `agentModel: hub` | On the hub only. External Secrets pushes the agent's own token to the spoke. | No fleet member uses it. It ran on one spoke that has been removed. |
 
 Hub-managed is the intended one: Harness API access belongs to the hub, and
@@ -66,7 +66,8 @@ charts/             application-sets, the official controller chart, gitops-agen
                     agent-registration, teams-bootstrap
 hub/                values for the Day 0 pipeline
 addons/hub/         values for the hub's add-ons (OpenBao)
-workshop/1-harness-setup/   OpenTofu for every Harness entity, and the pipeline
+workshop/README.md         local workshop and verification
+workshop/1-harness-setup/   OpenTofu for shared Harness entities and the pipeline
 workshop/2-clusters/        OpenTofu and k3d.sh for the local test clusters
 docs/               the architecture document, an older page on people and
                     ownership, diagrams
@@ -82,53 +83,12 @@ to run Argo CD and the agent on the spoke.
 
 ## From zero to a hub
 
-For an offline check, run `python3 tests/check-appsets.py` from the repository
-root with Helm and PyYAML installed.
-
-1. Create or update the Harness entities with `tofu apply` in
-   [workshop/1-harness-setup/](workshop/1-harness-setup/README.md). It needs a
-   Harness account, a personal access token and a GitHub App installed on
-   this repo.
-2. Have a cluster for the hub with a Harness delegate in it. For a local k3d
-   hub, the `hub` workspace of
-   [workshop/2-clusters/](workshop/2-clusters/README.md) creates both.
-3. For a grouped test, push `workshop-appsets-groups` to the GitHub repo used
-   by the connector. Apply the Harness setup in step 1 from that checkout.
-4. Run pipeline `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`.
-   The set fills `git_ref` with `main`. For a grouped test, select the input set,
-   then change `git_ref` to `workshop-appsets-groups` in the Run Pipeline dialog.
-   Use an isolated test hub and check that the selected infrastructure's
-   delegate is connected there. The pipeline installs the controller into
-   `hga-system`, then the hub agent and Argo CD into `hga-hub-agent`.
-5. On `workshop-appsets-groups`, the root Application applies
-   `bootstrap/groups.yaml`. This ApplicationSet creates `hub-cluster-addons`,
-   `hub-cluster-fleet` and `hub-cluster-agents`.
-   Each installs `charts/application-sets` with the corresponding `groups/`
-   values, producing the ApplicationSets for the hub's add-ons, fleet member
-   registration, and agent deployment.
-
-Check:
-
-```bash
-kubectl -n hga-hub-agent get applications,applicationsets
-kubectl -n hga-hub-agent get application cluster-application-sets \
-  -o jsonpath='{.spec.source.targetRevision}{"\n"}'
-```
-
-Check both Helm deploy logs for the selected branch. The root Application,
-group Applications and their Git-backed children should all reference it.
-Check that the group Applications sync, the hub add-on Applications are Synced
-and Healthy, and the hub agent is CONNECTED and HEALTHY in Harness. Then add
-the test spoke's OpenBao entries and verify its cluster Secret, Applications,
-agent and Ready project mappings.
-
-For a fresh test, use an empty hub with a hub agent identifier available in the
-test Harness account. Then rerun the same branch and input set on that hub.
-Verify that the existing hub registration, group and workload Applications,
-and project mappings stay healthy without duplicates. Use the empty hub for
-the first grouped test because pruning is disabled. On an existing hub, the
-old `hub-cluster-spokes` Application can remain and keep tracking the same
-spoke ApplicationSets that `hub-cluster-agents` would manage.
+Follow the [workshop guide](workshop/README.md) for prerequisites, commands,
+and verification. The first OpenTofu stage creates the Harness
+entities. The second creates the local hub and installs its delegate. The
+`hga_hub_bootstrap` pipeline installs the controller, hub agent and Argo CD.
+For the grouped bootstrap, use the `workshop-appsets-groups` branch as the
+pipeline's `git_ref`.
 
 ## Add a cluster with an agent
 
@@ -189,11 +149,11 @@ only the spokes of that stage. Namespaces must start with `<team>-`.
   and with it the hub's access to the spoke.
 - No old `<cluster>-agent-token` Secret may exist where a controller is about
   to register an agent. The controller never overwrites one.
-- OpenBao runs in dev mode and is empty after every restart. Write the cluster
-  connections and the keys again; `workshop/2-clusters/README.md` has the two
-  commands.
+- OpenBao runs in dev mode and is empty after every restart. Restore the
+  cluster connections and keys using the
+  [restart instructions](workshop/2-clusters/README.md#after-a-hub-restart).
 - An ApplicationSet that matches nothing still reports success. Check
-  `kubectl get applications`.
+  `kubectl --context k3d-hga-hub -n hga-hub-agent get applications`.
 - Harness expressions in comments under `hub/` are evaluated. Never write
   expression syntax in a comment there.
 - The hub holds cluster-admin on every spoke.

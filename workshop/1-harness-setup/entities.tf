@@ -28,7 +28,7 @@ resource "harness_platform_environment" "this" {
   project_id = local.project_scope.project_id
   # The verify step must run on the hub's own delegate, the one the connector
   # selects; without a step selector Harness may pick any delegate in the account.
-  yaml = replace(local.yaml.environment, "value: local-hub-delegate", "value: ${var.hub_delegate_name}")
+  yaml = replace(local.yaml.environment, "value: hga-test-hub", "value: ${var.hub_delegate_name}")
 }
 
 resource "harness_platform_infrastructure" "hga_system" {
@@ -92,7 +92,7 @@ resource "harness_platform_service" "account_agent" {
   tags        = [for k, v in yamldecode(local.yaml.svc_account_agent).service.tags : "${k}:${v}"]
   org_id      = local.project_scope.org_id
   project_id  = local.project_scope.project_id
-  yaml        = local.yaml.svc_account_agent
+  yaml        = replace(local.yaml.svc_account_agent, "https://github.com/harness-landing-zone/harness-gitops.git", jsonencode("${local.github_owner_url}/harness-gitops.git"))
   depends_on = [
     harness_platform_connector_github.this,
     harness_platform_connector_kubernetes.hub,
