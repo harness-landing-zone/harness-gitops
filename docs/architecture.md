@@ -23,8 +23,11 @@ One account-level agent on a **hub** cluster deploys an agent onto every
 should only do GitOps: run Argo CD and its agent, and hold nothing but that
 agent's own token.
 
-The build does not meet that intent yet: each spoke runs its own controller
-and holds a Harness API key, scoped to its tenant's org.
+Two models exist. In the **self-managed** model the spoke runs its own
+controller and holds a Harness API key, so it does not meet the intent. The
+one fleet member runs it. In the **hub-managed** model, the default, the key
+and the agent objects stay on the hub, which meets the intent. No fleet member uses it
+today. Both are described below.
 
 ## Names
 
@@ -43,6 +46,8 @@ and holds a Harness API key, scoped to its tenant's org.
 | Mapping | A `HarnessGitopsProjectMapping` resource: one AppProject mapped to one Harness project. |
 | Cluster Secret | An Argo CD cluster Secret on the hub. Its labels decide what gets installed on that cluster. |
 | Store | OpenBao on the hub, read by ESO through `ClusterSecretStore` `hub-openbao`. |
+| Self-managed | Controller, API key and agent objects are on the spoke. Member file `controller: self`, cluster Secret label `controller: self`. |
+| Hub-managed | API key and agent objects stay on the hub; only the hub's controller runs. Member file `controller: hub` (the default), cluster Secret label `controller: hub`. |
 
 ## Repository layout
 
@@ -50,9 +55,9 @@ and holds a Harness API key, scoped to its tenant's org.
 groups/
   addons.yaml   ESO and OpenBao on the hub
   fleet.yaml    one Application per member file to register its cluster Secret
-  agents.yaml   spoke controller, runtime and teams
+  agents.yaml   spoke controller, runtime and teams, plus hub-managed agent registration
 fleet-members/<cluster>.yaml  one file per spoke: tenant, stage, model,
-                              harnessSecretName
+                              controller, harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
   defaults/values.yaml                values for every agent of the tenant
@@ -64,7 +69,7 @@ charts/
   harness-gitops-agent-controller   the official controller chart, unchanged
   gitops-agent                wraps the official gitops-helm chart (Argo CD and agent)
   cluster-registration        the store, each spoke's Argo CD connection on the hub, and push setup
-  agent-registration          the agent object and the locked default AppProject
+  agent-registration          the agent object, the locked default AppProject, and the token push
   teams-bootstrap             per team: namespaces, AppProject, mapping
 hub/                values for the Day 0 pipeline: controller.yaml, account-agent.yaml
 addons/defaults/openbao/values.yaml       values for OpenBao, the only add-on with a values file
@@ -77,26 +82,36 @@ docs/               this document, an older page on people and ownership, diagra
 
 ## Who holds what
 
-| Thing | Where [live] |
-|---|---|
-| Controller | Hub, and one on every spoke |
-| Account-level API key | Hub, namespace `hga-system` |
-| API key that registers the spoke's agent | The spoke's own key, scoped to the tenant's org. It is in the store at `harness-api-keys/<cluster>` and on the spoke as `harness-api-key-secret` in `hga-system`. The hub pushes it there when the member file sets `harnessSecretName`; without that setting a person creates the Secret. |
-| Agent object | Spoke |
-| Agent token | Written on the spoke by the spoke's controller |
-| Mappings | Spoke |
-| Argo CD and the agent pod | Spoke |
-| Team namespaces and AppProjects | Spoke |
-| Spoke connection with cluster-admin | Hub: the cluster Secret and the store, plus a kubeconfig Secret for ESO when the key is pushed |
+| Thing | Self-managed (`controller: self`) [live] | Hub-managed (`controller: hub`) |
+|---|---|---|
+| Controller | Hub, and one on every spoke | Hub only |
+| Account-level API key | Hub, namespace `hga-system` | Same |
+| API key that registers the spoke's agent | The spoke's own key, scoped to the tenant's org. It is in the store at `harness-api-keys/<cluster>` and on the spoke as `harness-api-key-secret` in `hga-system`. The hub pushes it there when the member file sets `harnessSecretName`; without that setting a person creates the Secret. | The tenant's key, on the hub only (`harness-api-key-<tenant>` in `hga-system`) |
+| Agent object | Spoke | Hub, in a namespace named after the spoke |
+| Agent token | Written on the spoke by the spoke's controller | Written on the hub by the hub's controller, then copied to the spoke by ESO |
+| Mappings | Spoke | Hub |
+| Placeholder AppProjects | None | Hub: one deny-all AppProject per team (see caveat 2) |
+| Argo CD and the agent pod | Spoke | Spoke |
+| Team namespaces and real AppProjects | Spoke | Spoke |
+| Spoke connection with cluster-admin | Hub: the cluster Secret and the store, plus a kubeconfig Secret for ESO when the key is pushed | Hub: the cluster Secret and the store, plus a kubeconfig Secret for ESO |
 
 Caveats that apply to the design, not to a missing step:
 
 1. **The hub holds cluster-admin on every spoke.** It needs it to install the
-   agent there. Whoever controls the hub controls every spoke. ESO holds the
-   same credential when it pushes the API key to a spoke.
-2. **A team's fence on a spoke is Argo CD policy.** The spoke's Argo CD has
+   agent there. Whoever controls the hub controls every spoke. This is true
+   in both models. ESO holds the same credential whenever it pushes to a
+   spoke: the agent token when hub-managed, the API key when self-managed.
+2. **Hub-managed needs placeholder AppProjects.** The controller marks a
+   mapping Ready only when an AppProject of that name exists beside the agent
+   object. When hub-managed the real AppProject is on the spoke, so the hub
+   carries an empty one of the same name. A Ready mapping on the hub then no
+   longer proves that the real AppProject exists on the spoke. The controller
+   does not document this check, so a controller change could break it.
+3. **A team's fence on a spoke is Argo CD policy.** The spoke's Argo CD has
    cluster-wide rights. What keeps a team in its own namespaces is its
    AppProject.
+4. **A hub-managed spoke cannot be registered while the hub is down.**
+   Agents that are already running keep working in both models.
 
 ## Part 1. From zero to a hub that manages spokes
 
@@ -125,7 +140,7 @@ The fleet group waits for member files and the corresponding OpenBao entries.
 - **The store is OpenBao in dev mode.** It keeps everything in memory, is
   opened with the chart's published dev token, and is empty after every
   restart. It holds cluster connections at `clusters/<cluster>` (keys
-  `server`, `caData`, `token`) and each spoke's API key at
+  `server`, `caData`, `token`) and each self-managed spoke's API key at
   `harness-api-keys/<cluster>` (property `api_key`). Only ExternalSecrets in
   `hga-hub-agent` may read it. [live]
 - **An empty hub, repeat run and migration from the earlier layout still need
@@ -134,15 +149,17 @@ The fleet group waits for member files and the corresponding OpenBao entries.
   track the same spoke ApplicationSets as the new group Application. Start on
   an empty hub and follow the [workshop guide](../workshop/README.md).
 
-## Part 2. Onboarding a cluster with an agent [live]
+## Part 2. Onboarding a cluster with an agent
+
+### Self-managed [live]
 
 | # | Who | Does what | Where |
 |---|---|---|---|
 | 1 | A person, OpenTofu | Only for a new tenant: its org, team projects, role and tenant key (`workshop/1-harness-setup/business-units.tf`). | Harness |
 | 2 | A person, OpenTofu | Adds `workshop/2-clusters/cluster-values/<cluster>.yaml` (`role: spoke`, the tenant's org under the key `bu`, optionally `harnessSecretName`) and runs `tofu apply` in workspace `<cluster>`. The name must be `spoke-<name>`. That creates the k3d cluster `hga-<cluster>`, ServiceAccount `argocd-manager` with cluster-admin on it, and the spoke's own service account, API key and token in the tenant's org. It writes the connection into the store at `clusters/<cluster>` and the key at `harness-api-keys/<cluster>`. | Laptop, spoke, Harness, hub |
-| 3 | A person | Commits `fleet-members/<cluster>.yaml` with `tenant`, `stage`, `model: agent` and `harnessSecretName: harness-api-keys/<cluster>`. | Git |
+| 3 | A person | Commits `fleet-members/<cluster>.yaml` with `tenant`, `stage`, `model: agent`, `controller: self` and `harnessSecretName: harness-api-keys/<cluster>`. | Git |
 | 4 | Hub Argo CD | `registration` makes Application `<cluster>-registration` in `hga-hub-agent`: an ExternalSecret for the cluster Secret and, because `harnessSecretName` is set, what pushes the key (a kubeconfig ExternalSecret, an ExternalSecret for the key, `ClusterSecretStore` `push-<cluster>-hga-system` and a `PushSecret`). | Hub |
-| 5 | ESO | Builds the cluster Secret `<cluster>`: the connection from the store, labels `fleet_member: spoke`, `model`, `addons`, `tenant`, `stage` from the member file, annotations copied from the hub. | Hub |
+| 5 | ESO | Builds the cluster Secret `<cluster>`: the connection from the store, labels `fleet_member: spoke`, `model`, `addons`, `controller`, `tenant`, `stage` from the member file, annotations copied from the hub. | Hub |
 | 6 | Hub Argo CD | The labels make three Applications for the spoke: `<cluster>-controller`, `<cluster>-runtime`, `<cluster>-teams`. | Hub to spoke |
 | 7 | Hub Argo CD | `<cluster>-controller` installs the controller and its CRDs into `hga-system`. | Spoke |
 | 8 | ESO | Pushes the key to the spoke as `harness-api-key-secret` in `hga-system`. It retries until step 7 has created the namespace. | Hub to spoke |
@@ -170,6 +187,46 @@ What is live and what is not:
   ran.
 - Step 2 is specific to the k3d test setup. Who writes a real cluster's
   connection and key into the store is an open question.
+
+### Hub-managed
+
+The member file says `controller: hub`, or leaves `controller` out. That adds
+the label `controller: hub` to the cluster Secret, and the ApplicationSets
+branch on it.
+
+No fleet member uses this model today. `spoke-prod` ran it on 2026-11-16
+and has since been removed. What was checked on that run is not
+recorded in this repository, so the steps below are described from the code.
+
+| Step | What differs from self-managed |
+|---|---|
+| Step 2 | `workshop/2-clusters` still makes a key for the spoke and stores it. Nothing uses it. |
+| Step 3 | The member file sets `controller: hub` and leaves `harnessSecretName` out. The chart refuses a file that has both. |
+| Step 4 | `<cluster>-registration` renders, beside the cluster Secret's ExternalSecret, a second ExternalSecret `<cluster>-kubeconfig`, built from the same store entry, and a `ClusterSecretStore` `push-<cluster>` that lets ESO write into namespace `<cluster>` on the spoke. Only the hub namespace `<cluster>` may use that store. No key is pushed. |
+| Steps 7 and 8 | Gone. No controller and no API key on the spoke. `controller` skips the cluster. |
+| New, on the hub | `agent` makes Application `<cluster>-agent` in hub namespace `<cluster>`: the agent object (using `harness-api-key-<tenant>` from the hub's `hga-system`), a `PushSecret`, and per team a mapping with a placeholder AppProject. |
+| Hub's controller | Registers the agent and writes `<cluster>-agent-token` on the hub. |
+| ESO | The `PushSecret` copies that Secret to the same name and namespace on the spoke. |
+| Step 9 | `<cluster>-runtime` installs Argo CD, the locked `default` AppProject and the agent pod, but no agent object. The pod starts once the pushed token arrives. |
+| Step 11 | `<cluster>-teams` installs only namespaces and real AppProjects. The mappings are on the hub. |
+
+The namespace has the same name on the hub and on the spoke, because the
+controller registers the agent with its object's namespace.
+
+Token delivery has one implementation: **push**, as above. **Pull** (the hub pushes the
+token into the store and an ESO on the spoke reads it) is [theory]: it needs
+ESO on every spoke, a store the spokes can reach, and a login per spoke.
+
+### Moving a running spoke from self-managed to hub-managed [theory]
+
+A takeover is not possible. The controller treats a Harness agent as its own
+only if it created it, so the hub's controller cannot adopt an agent that a
+spoke's controller registered. The move is: switch the agent off in the
+member file, delete the agent object on the spoke so its controller
+deregisters it, remove the controller, its CRDs and the key Secret from the
+spoke, then remove `harnessSecretName` from the member file and set
+`controller: hub`. The agent is registered again with a new token.
+Applications that teams created on the old agent are not covered by this plan.
 
 ### Onboarding a team [live on `spoke-test`]
 
@@ -219,6 +276,7 @@ resources and every resource in the `gitops.harness.io` group.
 
 Kept simple on purpose. None of this is planned work yet.
 
+- **Pull delivery of the agent token**, as described above.
 - **A persistent store.** Replace dev-mode OpenBao with a store that survives
   restarts, and replace the dev token with Kubernetes auth for ESO.
 - **Staged upgrades.** A pinned revision per stage, so one stage moves before
@@ -230,39 +288,51 @@ Kept simple on purpose. None of this is planned work yet.
   Secret describes exactly one agent today; the Argo CD CRDs can have only
   one owner per cluster; two Argo CDs on one cluster can claim each other's
   resources; and the cluster-wide one can still reach into the other's
-  namespaces.
+  namespaces. Hub-managed makes this easier, because nothing of the
+  controller remains on the spoke.
 
 ## Not proven yet
 
-1. Grouped bootstrap on an empty hub, a repeat run and migration from the
+1. The hub-managed model on a current fleet member: the `PushSecret` through
+   ESO's Kubernetes store, the agent pod starting on a pushed token without
+   a manual restart, and mappings going Ready on the hub against placeholder
+   AppProjects. It ran on one spoke that no longer exists, with no record
+   here of what was checked.
+2. Moving a running spoke from self-managed to hub-managed.
+3. Grouped bootstrap on an empty hub, a repeat run and migration from the
    earlier layout.
-2. The `hub` workspace of `workshop/2-clusters` (cluster and delegate).
-3. Any upgrade of Argo CD, the agent or the controller on a spoke.
-4. Offboarding a team or a tenant. Spokes have been removed by hand.
-5. A second tenant (`tenants/bu2/` is empty), a second stage running beside
+4. The `hub` workspace of `workshop/2-clusters` (cluster and delegate).
+5. Any upgrade of Argo CD, the agent or the controller on a spoke.
+6. Offboarding a team or a tenant. Spokes have been removed by hand.
+7. A second tenant (`tenants/bu2/` is empty), a second stage running beside
    `test`, and a teams folder for one stage.
-6. A team deploying from its own repository. The only Application that has
+8. A team deploying from its own repository. The only Application that has
    run is one example created by hand on an earlier spoke.
-7. The store after a restart: that ESO keeps the cluster Secrets and the
+9. The store after a restart: that ESO keeps the cluster Secrets and the
    pushed keys, and recovers once the entries are written again.
-8. Anything outside k3d: a real cloud cluster, a persistent store, a
+10. Anything outside k3d: a real cloud cluster, a persistent store, a
     network where the hub cannot reach a spoke's API.
 
 ## Open questions
 
-1. Is cluster-admin for the hub on every spoke acceptable in the reference,
+1. Which spoke runs hub-managed next? None does today.
+2. Placeholder AppProjects: accept them, or change the controller so a
+   mapping for an agent on another cluster needs none?
+3. API keys: a self-managed spoke has its own key, hub-managed agents share
+   the tenant's key. Should hub-managed also use one key per spoke?
+4. Is cluster-admin for the hub on every spoke acceptable in the reference,
    or should the agent be installed when the cluster is created, so the hub
    needs less?
-2. Who writes a new cluster's connection and key into the store in a real
+5. Who writes a new cluster's connection and key into the store in a real
    setup: the provisioning that creates the cluster?
-3. Which store does the workshop use once dev-mode OpenBao is replaced?
-4. Does the reference need staged upgrades (a pinned revision per stage)
+6. Which store does the workshop use once dev-mode OpenBao is replaced?
+7. Does the reference need staged upgrades (a pinned revision per stage)
    before it is published?
-5. What may a team's users do in Harness? No Harness roles are designed for
+8. What may a team's users do in Harness? No Harness roles are designed for
    them.
-6. Who raises changes to a tenant's files: the tenant by pull request, or
+9. Who raises changes to a tenant's files: the tenant by pull request, or
    only the platform team?
-7. What is the offboarding sequence for a team, a spoke and a tenant?
+10. What is the offboarding sequence for a team, a spoke and a tenant?
 
 ## Inconsistencies in the repository at this commit
 

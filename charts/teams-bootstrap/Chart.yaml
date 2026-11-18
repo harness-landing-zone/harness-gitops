@@ -2,7 +2,9 @@ apiVersion: v2
 name: teams-bootstrap
 description: >-
   The teams of one GitOps agent: per team its namespaces, the AppProject that
-  fences it and its Harness project mapping.
+  fences it and its Harness project mapping. For a hub-managed spoke the
+  mapping (with a deny-all placeholder AppProject) is on the hub and the rest
+  on the spoke.
   Separate from the agent (charts/agent-registration), so teams change
   on their own lifecycle.
 type: application

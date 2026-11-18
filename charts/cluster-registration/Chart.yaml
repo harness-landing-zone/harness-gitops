@@ -3,8 +3,9 @@ name: cluster-registration
 description: |
   The store (once, on the hub): the ClusterSecretStore for OpenBao. Per fleet
   member: an ExternalSecret that builds the Argo CD cluster Secret from
-  OpenBao, with the labels from git. For a spoke with harnessSecretName, also
-  a kubeconfig ExternalSecret, a push store, the key ExternalSecret and the
-  PushSecret that copy its controller key to the spoke.
+  OpenBao, with the labels from git. For a hub-managed spoke, or a
+  self-managed spoke with harnessSecretName, also a kubeconfig ExternalSecret
+  and a push store; for the self-managed one also the key ExternalSecret and
+  the PushSecret that copy its controller key to the spoke.
 version: 0.1.0
 type: application

@@ -16,9 +16,15 @@ ownership and validation history, see the [architecture](docs/architecture.md).
 
 Previous workshop runs used one local k3d hub and one spoke, `spoke-test`.
 The grouped bootstrap has been rendered locally with Helm. Live validation is pending.
-The controller and a Harness API key are on the hub and on every spoke. Each
-spoke has its own key, which the hub pushes to it. This ran on `spoke-test`
-in the earlier workshop.
+Two models exist for a spoke's agent:
+
+| Model | Member file | Where the controller and the Harness API key are | State |
+|---|---|---|---|
+| Self-managed | `controller: self` | On the hub and on every spoke. Each spoke has its own key, which the hub pushes to it. | Ran on `spoke-test` in the earlier workshop |
+| Hub-managed | `controller: hub` (the default) | On the hub only. External Secrets pushes the agent's own token to the spoke. | No fleet member uses it. It ran on one spoke that has been removed. |
+
+Hub-managed is the intended one: Harness API access belongs to the hub, and
+a spoke only does GitOps.
 
 ```mermaid
 flowchart LR
@@ -29,12 +35,12 @@ flowchart LR
     eso["External Secrets + OpenBao<br/>cluster connections, spoke keys"]
   end
   subgraph spoke["Spoke cluster"]
-    sctrl["Controller + API key"]
+    sctrl["Controller + API key<br/>self-managed only"]
     rt["Argo CD + agent<br/>namespace = cluster name"]
     teams["Team namespaces<br/>and AppProjects"]
   end
   eso -- "cluster Secret<br/>with labels" --> hubargo
-  eso -- "pushes the key" --> sctrl
+  eso -- "pushes the key<br/>self-managed only" --> sctrl
   hubargo -- "installs" --> sctrl
   hubargo -- "installs" --> rt
   hubargo -- "installs" --> teams
@@ -47,7 +53,7 @@ flowchart LR
 
 ```
 groups/             addons, fleet registration, and spoke agent group values
-fleet-members/      one file per spoke: tenant, stage, model,
+fleet-members/      one file per spoke: tenant, stage, model, controller,
                     harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
@@ -85,6 +91,8 @@ pipeline's `git_ref`.
 
 ## Add a cluster with an agent
 
+Self-managed:
+
 1. Write two entries into the store: the cluster's connection at
    `clusters/<cluster>` (keys `server`, `caData`, `token`) and the spoke's own
    Harness API key at `harness-api-keys/<cluster>` (property `api_key`). For a
@@ -97,6 +105,7 @@ pipeline's `git_ref`.
    stage: test        # which values and teams it gets
    model: agent       # install an agent (push: registered only)
    addons: hub        # the hub pushes this cluster's add-ons
+   controller: self   # self = self-managed, hub = hub-managed
    harnessSecretName: harness-api-keys/<cluster>   # the key the hub pushes
    ```
 
@@ -110,6 +119,10 @@ them together.
 
 Without `harnessSecretName`, create Secret `harness-api-key-secret` in
 namespace `hga-system` on the spoke by hand.
+
+With `controller: hub`, leave `harnessSecretName` out: no key and no
+controller go to the spoke. See the architecture document for what that model
+installs where, and for what is not proven.
 
 ## Add a team
 
@@ -150,6 +163,7 @@ only the spokes of that stage. Namespaces must start with `<team>-`.
 
 ## Not included yet
 
+- Hub-managed on a current fleet member, and moving a spoke to it.
 - A persistent secret store.
 - Staged upgrades across stages.
 - Offboarding a team, a spoke or a tenant.

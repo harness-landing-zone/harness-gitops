@@ -1,9 +1,13 @@
 {{- /*
-Lets ESO on the hub write into a spoke with harnessSecretName: its own
-controller's API key, which workshop/2-clusters wrote into OpenBao, is pushed
-to hga-system/harness-api-key-secret through push-<cluster>-hga-system, which
-only this release's namespace may use. It errors and retries until the
-spoke's controller has created hga-system.
+Lets ESO on the hub write into this spoke, for one of two reasons:
+- Hub-managed spoke: the agent's token (charts/agent-registration's PushSecret)
+  goes through push-<cluster>, which only the agent's own hub namespace
+  (<cluster>) may use.
+- A self-managed spoke with harnessSecretName: its own controller's API key,
+  which workshop/2-clusters wrote into OpenBao, is pushed to
+  hga-system/harness-api-key-secret through push-<cluster>-hga-system, which
+  only this release's namespace may use. It errors and retries until the
+  spoke's controller has created hga-system.
 The kubeconfig ExternalSecret builds a Secret from the same store entry as the
 cluster Secret (argocd-manager's long-lived token, so it is as powerful as the
 cluster Secret). The push stores read it through authRef, so the spoke's URL
@@ -11,15 +15,20 @@ stays in the store and out of git.
 */}}
 {{- if .Values.externalSecret.enabled }}
 {{- $name := .Values.clusterName }}
+{{- $agent := eq .Values.model "agent" }}
+{{- $hub := and $agent (eq .Values.controller "hub") }}
 {{- $key := .Values.harnessSecretName }}
 {{- if $key }}
+{{- if $hub }}
+{{- fail "harnessSecretName must be empty with controller hub: the hub model puts no API key on the spoke" }}
+{{- end }}
 {{- /* Under harness-api-keys/, where workshop/2-clusters writes keys: never a cluster connection (clusters/). Which key a spoke gets is reviewed in its member file. */}}
 {{- if not (regexMatch "^harness-api-keys/[a-z0-9]([-a-z0-9_/]*[a-z0-9])?$" $key) }}
 {{- fail (printf "harnessSecretName %q must be harness-api-keys/<name>" $key) }}
 {{- end }}
 {{- end }}
-{{- $pushKey := and (eq .Values.model "agent") $key }}
-{{- if $pushKey }}
+{{- $pushKey := and $agent (eq .Values.controller "self") $key }}
+{{- if or $hub $pushKey }}
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -69,6 +78,32 @@ spec:
                 cluster: {{ $name }}
                 user: argocd-manager
           current-context: {{ $name }}
+{{- end }}
+{{- if $hub }}
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: push-{{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  conditions:
+    - namespaces: [{{ $name }}]
+  provider:
+    kubernetes:
+      remoteNamespace: {{ $name }}
+      # authRef replaces server and auth: the kubeconfig carries both.
+      authRef:
+        name: {{ $name }}-kubeconfig
+        namespace: {{ .Release.Namespace }}
+        key: kubeconfig
+{{- end }}
+{{- if $pushKey }}
 ---
 # The spoke's own controller key, from OpenBao.
 apiVersion: external-secrets.io/v1

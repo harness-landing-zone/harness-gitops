@@ -1,9 +1,12 @@
 apiVersion: v2
 name: agent-registration
 description: >-
-  A GitOps agent's Harness side: the HarnessGitopsAgent and a locked default
-  AppProject on the spoke, whose own controller registers the agent and
-  writes its token beside it for the runtime (charts/gitops-agent). The teams
-  are charts/teams-bootstrap.
+  A GitOps agent's Harness side. Self-managed spoke (target all): the
+  HarnessGitopsAgent and a locked default AppProject on the spoke, whose own
+  controller registers the agent and writes its token beside it for the
+  runtime (charts/gitops-agent). Hub-managed spoke: on the hub, in namespace
+  <cluster>, the HarnessGitopsAgent and the PushSecret that copies its token
+  to the spoke (target hub); on the spoke, the locked default AppProject only
+  (target spoke). The teams are charts/teams-bootstrap.
 type: application
 version: 0.2.0

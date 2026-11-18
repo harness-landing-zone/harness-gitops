@@ -19,13 +19,18 @@ model: agent
 # deploys applications. self (the spoke's own Argo CD installs them) is built
 # but parked. Stamped as label addons.
 addons: hub
+# Where the Harness controller, its key, the agent object and the team
+# mappings live. self = self-managed: all on this spoke. hub (the default) =
+# hub-managed: they stay on the hub, its controller does the work and ESO
+# pushes the token. Stamped as label controller.
+controller: self
 # Extra labels for the cluster Secret. An add-on's switch goes here: whoever
 # installs this spoke's add-ons (see addons above) installs that add-on as
 # <spoke>-<add-on>.
 labels:
   enable_external_secrets: "true"
-# The OpenBao path of this spoke's controller key
+# Self-managed only: the OpenBao path of this spoke's controller key
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =
-# that Secret is created by hand.
+# that Secret is created by hand. Must stay empty when hub-managed.
 harnessSecretName: harness-api-keys/spoke-test

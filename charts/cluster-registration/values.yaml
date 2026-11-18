@@ -28,6 +28,13 @@ model: ""
 # cluster's own Argo CD installs them (model: agent only), reading this
 # repository itself.
 addons: hub
+# From the member file, stamped as label controller: where the Harness
+# controller, its key, the agent object and the team mappings live (model:
+# agent only). hub (the default) = hub-managed: only the hub's controller
+# runs, and the kubeconfig ExternalSecret and push store let ESO push the
+# agent's token to the spoke (templates/push.yaml). self = self-managed: the
+# spoke runs its own controller.
+controller: hub
 # From the member file: extra labels for the cluster Secret. An add-on's
 # switch goes here, for example enable_external_secrets: "true"
 # (groups/addons.yaml). The labels the chart sets itself are refused.
@@ -37,7 +44,7 @@ labels: {}
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m
-# From the member file: the OpenBao
+# From the member file. Self-managed spokes (controller self) only: the OpenBao
 # path of this spoke's own controller key (property api_key), written by
 # workshop/2-clusters (its cluster-values harnessSecretName, the same value);
 # must be under harness-api-keys/. Set = the hub
