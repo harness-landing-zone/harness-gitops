@@ -46,7 +46,6 @@ flowchart LR
 ## Layout
 
 ```
-bootstrap/          group installer ApplicationSet, applied by the hub's root Application
 groups/             addons, fleet registration, and spoke agent group values
 fleet-members/      one file per spoke: tenant, stage, gitopsAgent,
                     harnessSecretName

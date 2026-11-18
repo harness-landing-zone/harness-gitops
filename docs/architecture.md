@@ -47,7 +47,6 @@ and holds a Harness API key, scoped to its tenant's org.
 ## Repository layout
 
 ```
-bootstrap/groups.yaml   group installer ApplicationSet applied by the root Application
 groups/
   addons.yaml   ESO and OpenBao on the hub
   fleet.yaml    one Application per member file to register its cluster Secret
@@ -111,7 +110,7 @@ Caveats that apply to the design, not to a missing step:
 | 6 | Pipeline `hga_hub_bootstrap`, stage 1 | Installs the controller and its CRDs into `hga-system` (`hub/controller.yaml`). | Hub | [live] |
 | 7 | Pipeline, stage 2 | Installs `charts/gitops-agent` into `hga-hub-agent` (`hub/account-agent.yaml`): Argo CD, the hub agent and its agent object, one mapping, the API key Secrets in `hga-system`, the repo credential, the cluster Secret `hub-cluster`, and the root Application. | Hub | [live] |
 | 8 | Controller | Registers the hub agent in Harness and writes its token. The agent connects. The pipeline's last step waits for that. | Hub, Harness | [live] |
-| 9 | Hub Argo CD | The root Application `cluster-application-sets` applies `bootstrap/groups.yaml` from `git_ref`. The `groups` ApplicationSet creates three Applications: `hub-cluster-addons`, `hub-cluster-fleet` and `hub-cluster-agents`. | Hub | [built] |
+| 9 | Hub Argo CD | The root ApplicationSet `groups`, made by the hub release, reads `groups/*.yaml` from `git_ref` and creates three Applications: `hub-cluster-addons`, `hub-cluster-fleet` and `hub-cluster-agents`. | Hub | [built] |
 | 10 | Hub Argo CD | Each group Application renders `charts/application-sets` with its `groups/<group>.yaml` values from the same branch. The addons group installs ESO, OpenBao and its store. | Hub | [built] |
 | 11 | Hub Argo CD | The fleet group's `cluster-registration` reads the member files. The agents group generates workload Applications for the resulting spoke cluster Secrets. | Hub | [built] |
 

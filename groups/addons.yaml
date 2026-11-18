@@ -1,5 +1,5 @@
-# Group addons: what the hub itself runs. Installed by bootstrap/groups.yaml
-# as Application <hub>-addons, with charts/application-sets. Every Application
+# Group addons: what the hub itself runs. Installed by the hub's root
+# ApplicationSet groups as Application <hub>-addons, with charts/application-sets. Every Application
 # it generates gets the label group: addons.
 #
 # Each add-on is selected on fleet_member: hub-cluster alone; spoke Secrets

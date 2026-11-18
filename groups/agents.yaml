@@ -1,5 +1,5 @@
 # Group agents: the GitOps agent and controller of every spoke. Installed
-# by bootstrap/groups.yaml as Application <hub>-agents, with
+# by the hub's root ApplicationSet groups as Application <hub>-agents, with
 # charts/application-sets. Every Application it generates gets the label
 # group: agents.
 #

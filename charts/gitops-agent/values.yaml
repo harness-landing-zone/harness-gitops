@@ -106,23 +106,28 @@ hubCluster:
   labels: {}
   annotations: {}
 
-# Root ApplicationSet: one root Application per hub-labelled cluster Secret,
-# syncing a flat folder of ApplicationSets. A post-install/post-upgrade hook,
-# so it can ship in the same release as the Argo CRDs.
+# Root ApplicationSet: the group installer. For each hub-labelled cluster
+# Secret and each file in groupsPath it makes one Application <hub>-<group>,
+# which installs charts/application-sets with that file as its values. A
+# post-install/post-upgrade hook, so it can ship in the same release as the
+# Argo CRDs.
 rootAppSet:
   enabled: false
-  name: cluster-application-sets
+  name: groups
   # Which cluster Secrets count as hubs. Never empty.
   selector:
     fleet_member: hub-cluster
   # Empty falls back to gitSecret.url.
   repoURL: ""
-  path: gitops/bootstrap
+  # Folder of group files in that repository: one values file per group.
+  groupsPath: groups
+  # Branch, tag or commit for the group files, the chart and what the groups
+  # install from this repository.
   targetRevision: HEAD
   # Literal destination cluster name instead of the generator placeholder.
   # Needed only when this chart is rendered through the Harness Argo plugin.
   destinationName: ""
-  # AppProject of the root Application.
+  # AppProject of the group Applications.
   project: default
   # Also create that AppProject as a hook (weight 0, before the
   # ApplicationSet), with gitopsAgent.appProject.description. Use this instead

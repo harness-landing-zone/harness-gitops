@@ -27,8 +27,9 @@ The hub is installed in one Native Helm release with no manual step after it:
 - The controller needs the API key as a Secret; Harness injects it at deploy
   time into the controller's namespace (`hga-system`).
 - A fresh Argo CD needs a credential for this repo before it can sync anything.
-- The installer in `bootstrap/groups.yaml` selects the hub by its cluster
-  Secret's labels and reads the Git repository and revision from it.
+- The root ApplicationSet `groups` is the group installer: it selects the hub
+  by its cluster Secret's labels and makes one Application per file in
+  `groups/`, from the repository and revision in `rootAppSet`.
 - The root ApplicationSet and its AppProject are Argo CRs. gitops-helm's
   `appProject` template refuses to render until the AppProject CRD exists,
   and this release installs that CRD, so they are post-install hooks here.

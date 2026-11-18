@@ -41,7 +41,7 @@ Each spoke runs its own controller and holds its own API key.
 |---|---|---|---|
 | The hub's controller, the account-level API key and each tenant's API key | Hub cluster, namespace `hga-system` | Platform team | proven |
 | Hub agent and its Argo CD | Hub cluster | Platform team | proven |
-| The ApplicationSets and the charts | This repo, `bootstrap/`, `spoke-bootstrap/` and `charts/` | Platform team | proven |
+| The ApplicationSets and the charts | This repo, `groups/` and `charts/` | Platform team | proven |
 | Member file `fleet-members/<cluster>.yaml`: tenant and stage of one spoke | This repo | Platform team | proven |
 | Spoke cluster Secret, labelled `tenant` and `stage` | Hub cluster | Platform team; External Secrets builds it from the store and the member file | proven |
 | Tenant files under `tenants/<tenant>/gitops-agents/`: agent values, and one file per team with its Harness project, namespaces and source repos | This repo | Platform team reviews every change | proven; who raises the change is open |

@@ -1,6 +1,7 @@
 # Renders one ApplicationSet per entry under applicationSets. It is installed
 # once per group, as EKS Fleet Management installs its application-sets chart
-# once per add-on group: bootstrap/groups.yaml makes one Application
+# once per add-on group: the hub's root ApplicationSet groups
+# (charts/gitops-agent) makes one Application
 # <hub>-<group> per file in groups/, and that file holds the group's entries
 # and settings. This file holds only the defaults every group shares.
 #

@@ -1,5 +1,6 @@
 # Group fleet: what makes a cluster a member of the fleet. Installed by
-# bootstrap/groups.yaml as Application <hub>-fleet, with charts/application-sets.
+# the hub's root ApplicationSet groups as Application <hub>-fleet, with
+# charts/application-sets.
 # Every Application it generates gets the label group: fleet.
 #
 # Harness indexes an Application's labels only when it is created, and
