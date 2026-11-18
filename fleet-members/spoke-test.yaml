@@ -17,11 +17,12 @@ model: agent
 # Who installs this spoke's add-ons. hub: the hub's Argo CD pushes them.
 # self: the spoke's own Argo CD installs them, so it must be able to read this
 # repository. Stamped as label addons.
-addons: hub
-# Extra labels for the cluster Secret. An add-on's switch goes here and makes
-# the hub install that add-on on this spoke, as <spoke>-<add-on>:
-#   labels:
-#     enable_external_secrets: "true"
+addons: self
+# Extra labels for the cluster Secret. An add-on's switch goes here: whoever
+# installs this spoke's add-ons (see addons above) installs that add-on as
+# <spoke>-<add-on>.
+labels:
+  enable_external_secrets: "true"
 # The OpenBao path of this spoke's controller key
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =
