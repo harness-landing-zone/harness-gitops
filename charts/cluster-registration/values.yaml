@@ -27,17 +27,10 @@ gitopsAgent: false
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m
-# From the member file (agentModel). "hub" = hub-managed: only the hub's
-# controller runs; the cluster Secret gets the label agent_model: hub, plus the
-# kubeconfig ExternalSecret and push store (templates/push.yaml). Empty =
-# self-managed: the spoke runs its own controller.
-agentModel: ""
-# From the member file. Self-managed spokes (agentModel "") only: the OpenBao
+# From the member file: the OpenBao
 # path of this spoke's own controller key (property api_key), written by
 # workshop/2-clusters (its cluster-values harnessSecretName, the same value);
 # must be under harness-api-keys/. Set = the hub
 # pushes it to the spoke as hga-system/harness-api-key-secret
 # (templates/push.yaml); empty = that Secret is created by hand.
 harnessSecretName: ""
-# How the agent token reaches the spoke. Only push exists; pull is not built.
-tokenDelivery: push

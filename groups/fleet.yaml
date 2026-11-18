@@ -16,7 +16,7 @@ applicationSets:
   # Registers every fleet member, as EKS Fleet Management does. A cluster is a
   # member because fleet-members/<cluster>.yaml exists. The file name is the
   # Argo CD cluster name and the cluster Secret name; the file says how the
-  # cluster is bootstrapped (tenant, stage, gitopsAgent, agentModel).
+  # cluster is bootstrapped (tenant, stage, gitopsAgent, harnessSecretName).
   #
   # For each file this makes Application <cluster>-cluster on the hub
   # (charts/cluster-registration). ESO then creates that cluster Secret in

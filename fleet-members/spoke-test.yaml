@@ -13,12 +13,8 @@ tenant: bu1
 stage: test
 # true: install a GitOps agent on this cluster (label fleet_member: spoke).
 gitopsAgent: true
-# The model. "" = self-managed: controller, key and agent objects on this
-# spoke. hub = hub-managed: key and agent objects stay on the hub, its
-# controller does the work and ESO pushes the token (label agent_model: hub).
-agentModel: ""
-# Self-managed only: the OpenBao path of this spoke's controller key
+# The OpenBao path of this spoke's controller key
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =
-# that Secret is created by hand. Must stay empty when hub-managed.
+# that Secret is created by hand.
 harnessSecretName: harness-api-keys/spoke-test

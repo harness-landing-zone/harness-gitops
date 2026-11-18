@@ -4,7 +4,6 @@ allow nothing. The teams' AppProjects come from charts/teams-bootstrap.
 Wave 1: after Argo CD's CRDs (wave 0), which may arrive in the same sync,
 hence also SkipDryRunOnMissingResource.
 */}}
-{{- if has .Values.target (list "all" "spoke") }}
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -25,4 +24,3 @@ spec:
   namespaceResourceBlacklist:
     - group: gitops.harness.io
       kind: "*"
-{{- end }}

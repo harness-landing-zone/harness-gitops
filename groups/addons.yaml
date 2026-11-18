@@ -50,7 +50,7 @@ applicationSets:
   # Every restart empties the store, so every spoke's entry must be written
   # again (workshop/2-clusters/k3d.sh register). Cluster Secrets already made
   # from it stay in place meanwhile. The store holds cluster connections
-  # (clusters/<cluster>: server, caData, token) and self-managed spokes'
+  # (clusters/<cluster>: server, caData, token) and spokes'
   # controller keys (harness-api-keys/<cluster>). The store objects retry
   # until the hub-external-secrets Application installs ESO's CRDs.
   hub-openbao:

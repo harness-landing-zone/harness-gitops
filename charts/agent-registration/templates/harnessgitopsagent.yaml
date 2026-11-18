@@ -1,6 +1,3 @@
-{{- if not (has .Values.target (list "all" "hub" "spoke")) }}
-{{- fail "target must be all, hub or spoke" }}
-{{- end }}
 {{- $a := .Values.gitopsAgent.harnessAgent }}
 {{- $id := .Values.gitopsAgent.harness.identity }}
 {{- $scope := upper (default "ORG" $a.spec.scope) }}
@@ -13,7 +10,6 @@
 {{- fail "gitopsAgent.harnessAgent.spec.tokenSecretRef must equal gitopsAgent.agent.existingSecrets.agentToken: the runtime reads the token the controller writes" }}
 {{- end }}
 {{- end }}
-{{- if has .Values.target (list "all" "hub") }}
 apiVersion: gitops.harness.io/v1alpha1
 kind: HarnessGitopsAgent
 metadata:
@@ -49,4 +45,3 @@ spec:
   {{- with $a.spec.existingAgentIdentifier }}
   existingAgentIdentifier: {{ . | quote }}
   {{- end }}
-{{- end }}
