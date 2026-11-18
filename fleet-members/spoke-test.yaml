@@ -14,10 +14,11 @@ stage: test
 # agent: install a GitOps agent on this cluster; push: registered only, the
 # hub's Argo CD deploys to it. Stamped as label model.
 model: agent
-# Who installs this spoke's add-ons. hub: the hub's Argo CD pushes them.
-# self: the spoke's own Argo CD installs them, so it must be able to read this
-# repository. Stamped as label addons.
-addons: self
+# Who installs this spoke's add-ons. hub: the hub's Argo CD pushes them, which
+# is the model in use: the hub does the whole bootstrap and the spoke's agent
+# deploys applications. self (the spoke's own Argo CD installs them) is built
+# but parked. Stamped as label addons.
+addons: hub
 # Extra labels for the cluster Secret. An add-on's switch goes here: whoever
 # installs this spoke's add-ons (see addons above) installs that add-on as
 # <spoke>-<add-on>.
