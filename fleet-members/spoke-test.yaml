@@ -11,8 +11,9 @@ tenant: bu1
 # The stage folder of tenants/<tenant>/gitops-agents/ (values and teams). There
 # is no test/ folder yet, so the spoke gets the default values and teams.
 stage: test
-# true: install a GitOps agent on this cluster (label fleet_member: spoke).
-gitopsAgent: true
+# agent: install a GitOps agent on this cluster; push: registered only, the
+# hub's Argo CD deploys to it. Stamped as label model.
+model: agent
 # The OpenBao path of this spoke's controller key
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =

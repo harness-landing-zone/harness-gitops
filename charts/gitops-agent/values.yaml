@@ -95,7 +95,7 @@ gitSecret:
   credsTemplate: false
 
 # Hub self-registration: an Argo CD cluster Secret naming THIS cluster, with
-# the labels the root ApplicationSet selects on. A plain resource, not a hook.
+# the labels the group ApplicationSets select on. A plain resource, not a hook.
 hubCluster:
   enabled: false
   # Argo cluster name AND Secret name.
@@ -106,17 +106,13 @@ hubCluster:
   labels: {}
   annotations: {}
 
-# Root ApplicationSet: the group installer. For each hub-labelled cluster
-# Secret and each file in groupsPath it makes one Application <hub>-<group>,
-# which installs charts/application-sets with that file as its values. A
+# Root ApplicationSet: the group installer. For each file in groupsPath it
+# makes one Application named after the group, on the hub, which installs charts/application-sets with that file as its values. A
 # post-install/post-upgrade hook, so it can ship in the same release as the
 # Argo CRDs.
 rootAppSet:
   enabled: false
   name: groups
-  # Which cluster Secrets count as hubs. Never empty.
-  selector:
-    fleet_member: hub-cluster
   # Empty falls back to gitSecret.url.
   repoURL: ""
   # Folder of group files in that repository: one values file per group.
@@ -124,8 +120,7 @@ rootAppSet:
   # Branch, tag or commit for the group files, the chart and what the groups
   # install from this repository.
   targetRevision: HEAD
-  # Literal destination cluster name instead of the generator placeholder.
-  # Needed only when this chart is rendered through the Harness Argo plugin.
+  # Destination cluster of the group Applications. Empty: hubCluster.name.
   destinationName: ""
   # AppProject of the group Applications.
   project: default

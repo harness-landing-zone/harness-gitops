@@ -1,5 +1,5 @@
 # Group fleet: what makes a cluster a member of the fleet. Installed by
-# the hub's root ApplicationSet groups as Application <hub>-fleet, with
+# the hub's root ApplicationSet groups as Application fleet, with
 # charts/application-sets.
 # Every Application it generates gets the label group: fleet.
 #
@@ -9,33 +9,30 @@
 #
 # An ApplicationSet whose generator matches nothing still reports success, so
 # check with `kubectl get applications`.
-labels:
-  app.kubernetes.io/part-of: cluster-registration
-
 applicationSets:
 
   # Registers every fleet member, as EKS Fleet Management does. A cluster is a
   # member because fleet-members/<cluster>.yaml exists. The file name is the
   # Argo CD cluster name and the cluster Secret name; the file says how the
-  # cluster is bootstrapped (tenant, stage, gitopsAgent, harnessSecretName).
+  # cluster is bootstrapped (tenant, stage, model, harnessSecretName).
   #
-  # For each file this makes Application <cluster>-cluster on the hub
+  # For each file this makes Application <cluster>-registration on the hub
   # (charts/cluster-registration). ESO then creates that cluster Secret in
   # hga-hub-agent from the connection in OpenBao clusters/<cluster>. The
-  # labels (tenant, stage, fleet_member) come from Git. The agents group
+  # labels (tenant, stage, fleet_member, model) come from Git. The agents group
   # selects on those labels.
   #
   # Removing a member file deletes nothing. Deleting the ExternalSecret deletes
   # the cluster Secret (creationPolicy Owner), so never delete it by hand for a
   # live spoke.
-  cluster-registration:
+  registration:
     # The hub's own cluster Secret (repo_url, harness_account_id) times one
     # entry per member file.
     selector:
       matchLabels:
         fleet_member: hub-cluster
     gitFiles: fleet-members/*.yaml
-    name: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
+    name: '{{ trimSuffix ".yaml" .path.filename }}-registration'
     labels:
       cluster: '{{ trimSuffix ".yaml" .path.filename }}'
       # From the member file; "" when a file leaves them out.

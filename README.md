@@ -47,7 +47,7 @@ flowchart LR
 
 ```
 groups/             addons, fleet registration, and spoke agent group values
-fleet-members/      one file per spoke: tenant, stage, gitopsAgent,
+fleet-members/      one file per spoke: tenant, stage, model,
                     harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
@@ -95,7 +95,7 @@ pipeline's `git_ref`.
    ```yaml
    tenant: bu1        # the Harness org
    stage: test        # which values and teams it gets
-   gitopsAgent: true  # install an agent
+   model: agent       # install an agent (push: registered only)
    harnessSecretName: harness-api-keys/<cluster>   # the key the hub pushes
    ```
 

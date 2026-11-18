@@ -17,11 +17,12 @@ clusterName: ""
 # business unit). From the member file.
 tenant: ""
 # The stage label (nonprod, prod, ...). From the member file. Required when
-# gitopsAgent is true.
+# model is agent.
 stage: ""
-# From the member file. true adds the label fleet_member: spoke, which
-# the agents group in groups/agents.yaml selects on.
-gitopsAgent: false
+# From the member file, required, stamped as label model: agent (the agents
+# group in groups/agents.yaml installs an agent) or push (registered only; the
+# hub's Argo CD deploys to it). Every member gets fleet_member: spoke.
+model: ""
 # The fleet group in groups/fleet.yaml copies repo_url and harness_account_id
 # from the hub cluster Secret.
 annotations: {}

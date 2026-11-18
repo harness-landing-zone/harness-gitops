@@ -1,4 +1,4 @@
-# Required. The spoke-teams entry in groups/agents.yaml sets the name of the
+# Required. The teams entry in groups/agents.yaml sets the name of the
 # HarnessGitopsAgent that every mapping points at.
 agentName: ""
 

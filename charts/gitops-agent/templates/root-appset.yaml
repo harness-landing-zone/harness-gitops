@@ -1,9 +1,9 @@
 {{- /* Reference addition (not in the official chart).
-Root ApplicationSet: the group installer. A matrix of the hub-labelled cluster
-Secret (the hubCluster Secret) and the files in rootAppSet.groupsPath stamps
-ONE Application per hub and group file, <hub>-<group>, which installs
-charts/application-sets with that file as its values. The chart renders the
-group's ApplicationSets into this namespace.
+Root ApplicationSet: the group installer. A git files generator over
+rootAppSet.groupsPath stamps ONE Application per group file, named after the
+group, which installs charts/application-sets with that file as its values
+into the hub (hubCluster.name, or rootAppSet.destinationName). The chart
+renders the group's ApplicationSets into this namespace.
 
 Applied as post-install/post-upgrade hooks: hook manifests are built at fire
 time, which is what lets these CRs ship in the SAME release as the Argo CRDs.
@@ -22,9 +22,6 @@ literally. */}}
 {{- $revision := default "HEAD" $as.targetRevision }}
 {{- if not $repoURL }}
 {{- fail "rootAppSet.repoURL is required when gitSecret.url is not set" }}
-{{- end }}
-{{- if not $as.selector }}
-{{- fail "rootAppSet.selector must not be empty - an empty clusters selector matches EVERY registered cluster, spokes included" }}
 {{- end }}
 {{- if $as.createProject }}
 {{- if .Values.gitopsAgent.appProject.enabled }}
@@ -77,20 +74,14 @@ spec:
     its ApplicationSets in place. */}}
     applicationsSync: create-update
   generators:
-    - matrix:
-        generators:
-          - clusters:
-              selector:
-                matchLabels:
-                  {{- toYaml $as.selector | nindent 18 }}
-          - git:
-              repoURL: {{ $repoURL | quote }}
-              revision: {{ $revision | quote }}
-              files:
-                - path: {{ printf "%s/*.yaml" (default "groups" $as.groupsPath) | quote }}
+    - git:
+        repoURL: {{ $repoURL | quote }}
+        revision: {{ $revision | quote }}
+        files:
+          - path: {{ printf "%s/*.yaml" (default "groups" $as.groupsPath) | quote }}
   template:
     metadata:
-      name: '{{`{{ .name }}-{{ trimSuffix ".yaml" .path.filename }}`}}'
+      name: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
       labels:
         group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
     spec:
@@ -111,16 +102,7 @@ spec:
               revision: {{ $revision | quote }}
       destination:
         namespace: {{ .Release.Namespace | quote }}
-        {{- /* The backtick form survives exactly ONE Go template pass (helm's),
-        so the ApplicationSet controller receives the literal placeholder.
-        Installed through an Argo Application with the Harness plugin, the CMP
-        runs a second pass and stores "<no value>"; set destinationName to a
-        literal cluster name in that case. */}}
-        {{- if $as.destinationName }}
-        name: {{ $as.destinationName | quote }}
-        {{- else }}
-        name: '{{`{{.name}}`}}'
-        {{- end }}
+        name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
       syncPolicy:
         automated:
           selfHeal: true

@@ -18,7 +18,7 @@ stays in the store and out of git.
 {{- fail (printf "harnessSecretName %q must be harness-api-keys/<name>" $key) }}
 {{- end }}
 {{- end }}
-{{- $pushKey := and .Values.gitopsAgent $key }}
+{{- $pushKey := and (eq .Values.model "agent") $key }}
 {{- if $pushKey }}
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret

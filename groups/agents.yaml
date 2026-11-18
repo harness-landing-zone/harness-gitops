@@ -1,5 +1,5 @@
 # Group agents: the GitOps agent and controller of every spoke. Installed
-# by the hub's root ApplicationSet groups as Application <hub>-agents, with
+# by the hub's root ApplicationSet groups as Application agents, with
 # charts/application-sets. Every Application it generates gets the label
 # group: agents.
 #
@@ -10,7 +10,6 @@
 # An ApplicationSet whose generator matches nothing still reports success, so
 # check with `kubectl get applications`.
 labels:
-  app.kubernetes.io/part-of: spoke-bootstrap
   cluster: '{{ .name }}'
   tenant: '{{ .metadata.labels.tenant }}'
   stage: '{{ .metadata.labels.stage }}'
@@ -21,10 +20,11 @@ applicationSets:
   # controller and its CRDs. The hub pushes harness-api-key-secret from
   # OpenBao when the member file sets harnessSecretName. The key can also be
   # created by hand. The runtime's agent object waits for these CRDs.
-  spoke-controller:
+  controller:
     selector:
       matchLabels:
         fleet_member: spoke
+        model: agent
       matchExpressions:
         - {key: tenant, operator: Exists}
         - {key: stage, operator: Exists}
@@ -53,10 +53,11 @@ applicationSets:
   #
   # Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
   # <stage>/values.yaml.
-  spoke-runtime:
+  runtime:
     selector:
       matchLabels:
         fleet_member: spoke
+        model: agent
       matchExpressions:
         - {key: tenant, operator: Exists}
         - {key: stage, operator: Exists}
@@ -166,10 +167,11 @@ applicationSets:
   # stage), then <stage>/teams/<team>/values.yaml (overrides or extra teams):
   # its namespaces (wave 0), its AppProject (1), its mapping (2). On a new
   # spoke it retries until the agent's CRDs and agent object exist.
-  spoke-teams:
+  teams:
     selector:
       matchLabels:
         fleet_member: spoke
+        model: agent
       matchExpressions:
         - {key: tenant, operator: Exists}
         - {key: stage, operator: Exists}
