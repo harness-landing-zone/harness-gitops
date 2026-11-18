@@ -63,17 +63,17 @@ tenants/<tenant>/gitops-agents/
 charts/             application-sets, the official controller chart, gitops-agent
                     (wraps the official gitops-helm), cluster-registration,
                     agent-registration, teams-bootstrap
-hub/                values for the Day 0 pipeline
+hub/                static values for the hub's day-0 install
 addons/defaults/    values for the add-ons (OpenBao); addons/clusters/<cluster>/ per cluster
 workshop/README.md         local workshop and verification
-workshop/1-harness-setup/   OpenTofu for shared Harness entities and the pipeline
-workshop/2-clusters/        OpenTofu and k3d.sh for the local test clusters
+workshop/1-harness-setup/   OpenTofu for the shared Harness entities
+workshop/2-clusters/        OpenTofu and k3d.sh: the local test clusters and the hub install
 docs/               the architecture document, an older page on people and
                     ownership, diagrams
 ```
 
-Harness resolves its expressions in the pipeline definitions and values under
-`hub/`. Keep Harness expressions out of the files Argo CD renders.
+The files under `hub/` hold only static values. OpenTofu adds the per-hub
+inputs and the keys when it installs the hub (`workshop/2-clusters/hub.tf`).
 
 The `fleet` group uses `cluster-registration` to set up the Argo CD connection
 to each spoke on the hub. The `agents` group uses `agent-registration` to
@@ -84,10 +84,10 @@ to run Argo CD and the agent on the spoke.
 
 Follow the [workshop guide](workshop/README.md) for prerequisites, commands,
 and verification. The first OpenTofu stage creates the Harness
-entities. The second creates the local hub and installs its delegate. The
-`hga_hub_bootstrap` pipeline installs the controller, hub agent and Argo CD.
-For the grouped bootstrap, use the `workshop-appsets-groups` branch as the
-pipeline's `git_ref`.
+entities. The second creates the local hub and installs the controller, the
+hub agent and Argo CD on it; Argo CD then bootstraps the groups. The hub
+follows the branch named by `revision` in
+`workshop/2-clusters/cluster-values/hub.yaml`.
 
 ## Add a cluster with an agent
 
@@ -98,7 +98,7 @@ Self-managed:
    Harness API key at `harness-api-keys/<cluster>` (property `api_key`). For a
    local k3d spoke, [workshop/2-clusters/](workshop/2-clusters/README.md)
    creates the cluster and the key and writes both entries.
-2. Commit `fleet-members/<cluster>.yaml` on the branch selected by `git_ref`:
+2. Commit `fleet-members/<cluster>.yaml` on the branch the hub follows:
 
    ```yaml
    tenant: bu1        # the Harness org
@@ -154,11 +154,9 @@ only the spokes of that stage. Namespaces must start with `<team>-`.
   [restart instructions](workshop/2-clusters/README.md#after-a-hub-restart).
 - An ApplicationSet that matches nothing still reports success. Check
   `kubectl --context k3d-hga-hub -n hga-hub-agent get applications`.
-- Harness expressions in comments under `hub/` are evaluated. Never write
-  expression syntax in a comment there.
 - The hub holds cluster-admin on every spoke.
-- The workshop uses one `git_ref` for its own charts and values, defaulting to
-  `main` for every stage. The upstream charts are pinned to ESO `2.15.0` and
+- The hub follows one branch for the group files, its own charts and their
+  values (`revision`, default `main`). The upstream charts are pinned to ESO `2.15.0` and
   OpenBao `0.30.7`.
 
 ## Not included yet

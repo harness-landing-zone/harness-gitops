@@ -71,11 +71,11 @@ charts/
   cluster-registration        the store, each spoke's Argo CD connection on the hub, and push setup
   agent-registration          the agent object, the locked default AppProject, and the token push
   teams-bootstrap             per team: namespaces, AppProject, mapping
-hub/                values for the Day 0 pipeline: controller.yaml, account-agent.yaml
+hub/                static values for the hub's day-0 install: controller.yaml, account-agent.yaml
 addons/defaults/openbao/values.yaml       values for OpenBao, the only add-on with a values file
 workshop/README.md            local workshop and verification
-workshop/1-harness-setup/     OpenTofu for shared Harness entities and the pipeline YAML
-workshop/2-clusters/          OpenTofu and k3d.sh: the test clusters, the delegate,
+workshop/1-harness-setup/     OpenTofu for the shared Harness entities
+workshop/2-clusters/          OpenTofu and k3d.sh: the test clusters, the hub install,
                               and each spoke's connection and API key in the store
 docs/               this document, an older page on people and ownership, diagrams
 ```
@@ -117,15 +117,15 @@ Caveats that apply to the design, not to a missing step:
 
 | # | Who | Does what | Where | Mark |
 |---|---|---|---|---|
-| 1 | A person | Makes the grouped branch available in the GitHub repository, installs a GitHub App for that repo, and saves its private key. Uses a test Harness account and a personal access token. | GitHub, Harness | [built] for the grouped branch. The GitHub App was used in earlier runs. |
-| 2 | A person, OpenTofu | `tofu apply` in `workshop/1-harness-setup/`. Creates the platform org and project, the account-level role, service account and API key for the controller, the Harness secrets, the GitHub and Kubernetes connectors, a delegate token, and the environment, infrastructures, services, pipeline and input set. | Harness | [live] |
+| 1 | A person | Uses a test Harness account and a personal access token. Forks the repository only to change groups or fleet members. | GitHub, Harness | [built] |
+| 2 | A person, OpenTofu | `tofu apply` in `workshop/1-harness-setup/`. Creates the platform org and project and the account-level role, service account, API key and token for the controller. | Harness | [built]; the pipeline-era entities are still in the test account |
 | 3 | Same apply | Per tenant (`business-units.tf`, only `bu1`): the org, one project per team (`team_a`, `team_b`), and an org-level role, service account, API key and token. | Harness | [live] |
-| 4 | A person, OpenTofu | `tofu apply` in workspace `hub` of `workshop/2-clusters/`. Creates the k3d cluster `hga-hub` and installs the Harness delegate using its name and token from the local state in step 2. | Laptop, hub | [built]. The earlier hub and its delegate were made by hand. |
-| 5 | A person | Confirms that the hub delegate is connected, then runs `hga_hub_bootstrap` with the `hga_hub_bootstrap_test` input set. The input set fills `git_ref` with `main`. Select `workshop-appsets-groups` in the run dialog for the grouped test. | Harness | [built] |
-| 6 | Pipeline `hga_hub_bootstrap`, stage 1 | Installs the controller and its CRDs into `hga-system` (`hub/controller.yaml`). | Hub | [live] |
-| 7 | Pipeline, stage 2 | Installs `charts/gitops-agent` into `hga-hub-agent` (`hub/account-agent.yaml`): Argo CD, the hub agent and its agent object, one mapping, the API key Secrets in `hga-system`, the repo credential, the cluster Secret `hub-cluster`, and the root Application. | Hub | [live] |
-| 8 | Controller | Registers the hub agent in Harness and writes its token. The agent connects. The pipeline's last step waits for that. | Hub, Harness | [live] |
-| 9 | Hub Argo CD | The root ApplicationSet `groups`, made by the hub release, reads `groups/*.yaml` from `git_ref` and creates three Applications: `addons`, `fleet` and `agents`. | Hub | [built] |
+| 4 | A person, OpenTofu | `tofu apply` in workspace `hub` of `workshop/2-clusters/`. Creates the k3d cluster `hga-hub`, then installs two Helm releases on it with values from `hub/` plus the per-hub inputs and keys read from step 2's state. | Laptop, hub | [built], not applied yet. The running hub was installed by the earlier pipeline. |
+| 5 | Same apply | Sets the branch the hub follows from `revision` in `cluster-values/hub.yaml` (default `main`). | Laptop | [built] |
+| 6 | Same apply, release `hga-controller` | Installs the controller and its CRDs into `hga-system` (`hub/controller.yaml`). | Hub | [built] |
+| 7 | Same apply, release `hga-hub-agent` | Installs `charts/gitops-agent` into `hga-hub-agent` (`hub/account-agent.yaml`): Argo CD, the hub agent and its agent object, one mapping, the API key Secrets in `hga-system`, the cluster Secret `hub-cluster`, and the root ApplicationSet `groups`. | Hub | [built] |
+| 8 | Controller | Registers the hub agent in Harness and writes its token. The agent connects. The apply waits for that. | Hub, Harness | [live] with the earlier install |
+| 9 | Hub Argo CD | The root ApplicationSet `groups`, made by the hub release, reads `groups/*.yaml` from the hub's `revision` and creates three Applications: `addons`, `fleet` and `agents`. | Hub | [built] |
 | 10 | Hub Argo CD | Each group Application renders `charts/application-sets` with its `groups/<group>.yaml` values from the same branch. The addons group installs ESO, OpenBao and its store. | Hub | [built] |
 | 11 | Hub Argo CD | The fleet group's `registration` reads the member files. The agents group generates workload Applications for the resulting spoke cluster Secrets. | Hub | [built] |
 
@@ -268,8 +268,8 @@ resources and every resource in the `gitops.harness.io` group.
   `tofu apply -replace='terraform_data.spoke_key[0]'` in each spoke's
   workspace writes its key again. Existing cluster Secrets stay in place
   meanwhile. [built]
-- **The workshop uses one `git_ref` across its own chart sources and values.**
-  It defaults to `main` for every stage. The two upstream chart versions are
+- **The hub follows one branch for the group files, its own charts and their values.**
+  It is `revision` in `cluster-values/hub.yaml`, default `main`. The two upstream chart versions are
   in `groups/addons.yaml`: ESO `2.15.0` and OpenBao `0.30.7`. [built]
 
 ## Part 3. Later [theory]
@@ -301,7 +301,7 @@ Kept simple on purpose. None of this is planned work yet.
 2. Moving a running spoke from self-managed to hub-managed.
 3. Grouped bootstrap on an empty hub, a repeat run and migration from the
    earlier layout.
-4. The `hub` workspace of `workshop/2-clusters` (cluster and delegate).
+4. The `hub` workspace of `workshop/2-clusters` (cluster and the two Helm releases).
 5. Any upgrade of Argo CD, the agent or the controller on a spoke.
 6. Offboarding a team or a tenant. Spokes have been removed by hand.
 7. A second tenant (`tenants/bu2/` is empty), a second stage running beside

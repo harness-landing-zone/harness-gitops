@@ -61,7 +61,8 @@ apiKeySecret:
   # manager.apiKeySecretNamespace, default: the controller's release
   # namespace). Empty means this release namespace.
   namespace: ""
-  # Supply only at deploy time from the CD platform's secret manager.
+  # Supply only at install time, never from a file in git (the workshop
+  # passes it with OpenTofu's set_sensitive).
   value: ""
   # More key Secrets in the same namespace, name: value, for example a
   # tenant's org-scoped key. Same supply rule as value.

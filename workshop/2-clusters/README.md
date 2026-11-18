@@ -4,10 +4,16 @@ Start with the [workshop guide](../README.md) for setup and verification.
 This stage provisions local k3d clusters. Each OpenTofu workspace uses the
 configuration in `cluster-values/<workspace>.yaml`.
 
-- The `hub` workspace creates k3d cluster `hga-hub` (context
-  `k3d-hga-hub`). It installs the delegate using the token and name from the
-  default workspace's local state in `../1-harness-setup/terraform.tfstate`.
-  The Harness setup variable `hub_delegate_name` defaults to `hga-test-hub`.
+- The `hub` workspace creates k3d cluster `hga-hub` (context `k3d-hga-hub`)
+  and installs two Helm releases from this checkout
+  ([`hub.tf`](hub.tf)): `hga-controller` (`charts/harness-gitops-agent-controller`,
+  values `hub/controller.yaml`) in `hga-system`, then `hga-hub-agent`
+  (`charts/gitops-agent`, values `hub/account-agent.yaml`) in
+  `hga-hub-agent`. The per-hub inputs and keys come from the default
+  workspace's local state in `../1-harness-setup/terraform.tfstate`; the keys
+  are passed only as sensitive Helm values. `revision` in
+  `cluster-values/hub.yaml` (default `main`) is the branch the hub's Argo CD
+  follows.
 - Each spoke workspace creates a k3d cluster and a tenant-scoped Harness API
   key. For `spoke-test`, the cluster is `hga-spoke-test` (context
   `k3d-hga-spoke-test`) and its connection details go to
@@ -16,12 +22,9 @@ configuration in `cluster-values/<workspace>.yaml`.
   `harnessSecretName` must match the key path used by the workspace.
 
 Use the same `HARNESS_ACCOUNT_ID` and `HARNESS_PLATFORM_API_KEY` as Stage 1.
-For an existing workshop hub using the Helm release `local-hub-delegate`,
-set `hub_delegate_name = "local-hub-delegate"` in the Stage 1
-`terraform.tfvars` and reapply Stage 1 first. Stage 2 will reuse that release.
-Create the hub and run its bootstrap pipeline before applying any spoke
-workspace. A spoke needs OpenBao running on the hub to store its connection
-and API key. The grouped branch already contains the `spoke-test` member file.
+Create the hub before applying any spoke workspace. A spoke needs OpenBao
+running on the hub to store its connection and API key. The repository
+already contains the `spoke-test` member file.
 
 ## Destroy the local infrastructure
 
@@ -36,7 +39,9 @@ tofu workspace select spoke-test && tofu destroy
 ```
 
 Once all workshop spoke destroys have succeeded, review and destroy the hub
-workspace.
+workspace. It uninstalls the `hga-hub-agent` release first, while the
+controller still runs, so the controller deregisters the hub agent in
+Harness; then the controller release, then the cluster.
 
 ```bash
 tofu workspace select hub && tofu destroy
@@ -57,5 +62,6 @@ tofu workspace select spoke-test && tofu apply -replace='terraform_data.spoke_ke
 
 ## State holds secrets
 
-Each spoke's API key is in its workspace state (`terraform.tfstate.d/`), which
-git ignores. Never commit it.
+The hub workspace's state holds the controller and tenant keys (as Helm
+values), and each spoke's API key is in its workspace state
+(`terraform.tfstate.d/`), which git ignores. Never commit it.

@@ -22,11 +22,12 @@ mappings.
 
 ## Why the extras exist
 
-The hub is installed in one Native Helm release with no manual step after it:
+The hub is installed in one Helm release with no manual step after it:
 
-- The controller needs the API key as a Secret; Harness injects it at deploy
-  time into the controller's namespace (`hga-system`).
-- A fresh Argo CD needs a credential for this repo before it can sync anything.
+- The controller needs the API key as a Secret; the install passes it in and
+  the chart writes it into the controller's namespace (`hga-system`).
+- A fresh Argo CD needs a credential for a private repo before it can sync
+  anything; a public repo needs none.
 - The root ApplicationSet `groups` is the group installer: it makes one
   Application per file in `groups/`, named after the group, on the hub, from
   the repository and revision in `rootAppSet`.

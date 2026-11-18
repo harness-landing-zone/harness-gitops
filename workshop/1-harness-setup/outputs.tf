@@ -1,29 +1,29 @@
-output "hub_delegate_name" {
-  description = "Name of the delegate selected by the hub connector and bootstrap pipeline."
-  value       = var.hub_delegate_name
-}
+# Read by ../2-clusters (workspace hub) from this folder's local state.
 
-output "delegate_token" {
-  description = "Delegate token for the hub delegate. Read with: tofu output -raw delegate_token"
-  value       = harness_platform_delegatetoken.hub.value
+output "controller_token" {
+  description = "The controller's account-level key (Secret harness-api-key-secret in hga-system)."
+  value       = harness_platform_token.controller.value
   sensitive   = true
 }
 
-output "delegate_install_command" {
-  description = "Helm commands to install the hub delegate from this setup directory."
-  value       = <<-EOT
-    helm repo add harness-delegate https://app.harness.io/storage/harness-download/delegate-helm-chart/
-    helm repo update harness-delegate
-    helm upgrade -i ${var.hub_delegate_name} --namespace harness-delegate-ng --create-namespace \
-      harness-delegate/harness-delegate-ng \
-      --set delegateName=${var.hub_delegate_name} \
-      --set accountId=${var.account_id} \
-      --set delegateToken="$(tofu output -raw delegate_token)" \
-      --set managerEndpoint=https://app.harness.io \
-      --set upgrader.enabled=true
-  EOT
+output "tenant_controller_tokens" {
+  description = "Each tenant's org-scoped controller key, by tenant (Secret harness-api-key-<bu> in hga-system)."
+  value       = { for bu, t in harness_platform_token.bu_controller : bu => t.value }
+  sensitive   = true
 }
 
-output "github_connector_ref" {
-  value = harness_platform_connector_github.this.id
+output "environment_id" {
+  value = var.environment_id
+}
+
+output "org_id" {
+  value = harness_platform_organization.this.id
+}
+
+output "project_id" {
+  value = harness_platform_project.this.id
+}
+
+output "repo_url" {
+  value = "https://github.com/${var.github_org}/harness-gitops.git"
 }

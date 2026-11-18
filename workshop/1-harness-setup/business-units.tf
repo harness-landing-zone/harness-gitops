@@ -92,16 +92,3 @@ resource "harness_platform_token" "bu_controller" {
   apikey_id   = harness_platform_apikey.bu_controller[each.key].id
   apikey_type = "SERVICE_ACCOUNT"
 }
-
-# Stored beside HGA-Token in the platform project, where the bootstrap pipeline
-# reads it into Secret harness-api-key-<bu> in hga-system.
-resource "harness_platform_secret_text" "bu_controller_token" {
-  for_each                  = local.business_units
-  identifier                = "hga_controller_${each.key}_token"
-  name                      = "hga_controller_${each.key}_token"
-  org_id                    = local.project_scope.org_id
-  project_id                = local.project_scope.project_id
-  secret_manager_identifier = "harnessSecretManager"
-  value_type                = "Inline"
-  value                     = harness_platform_token.bu_controller[each.key].value
-}

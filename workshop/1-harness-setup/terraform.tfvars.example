@@ -1,13 +1,8 @@
 # Copy to terraform.tfvars (git-ignored) and fill in. Placeholders only.
-account_id                  = "REPLACE_WITH_HARNESS_ACCOUNT_ID"
-github_org                  = "REPLACE_WITH_GITHUB_OWNER"
-github_app_id               = "REPLACE_WITH_APP_ID"
-github_app_installation_id  = "REPLACE_WITH_INSTALLATION_ID"
-github_app_private_key_file = "~/.ssh/REPLACE_github_app.pem"
-# github_app_private_key_pkcs8_file = "~/.ssh/REPLACE_github_app.pkcs8.pem"
+account_id = "REPLACE_WITH_HARNESS_ACCOUNT_ID"
 
 # Defaults; change only if you need to.
-# org_id            = "gitops_reference"
-# project_id        = "gitops_admin"
-# environment_id    = "test"
-# hub_delegate_name = "hga-test-hub"
+# github_org     = "harness-landing-zone"  # owner of your fork, if you use one
+# org_id         = "gitops_reference"
+# project_id     = "gitops_admin"
+# environment_id = "test"

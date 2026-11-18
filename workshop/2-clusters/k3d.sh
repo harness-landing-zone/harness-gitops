@@ -7,8 +7,6 @@
 # command also works by hand.
 #
 #   k3d.sh hub               create hga-hub if missing, pin it
-#   k3d.sh delegate <name>   install the Harness delegate <name> on the hub
-#                            ($DELEGATE_TOKEN, $HARNESS_ACCOUNT_ID)
 #   k3d.sh pin [cluster...]  fix each container's current address on network hga
 #                            (no cluster: every hga-* cluster)
 #   k3d.sh register          write every hga-spoke-* cluster's connection into
@@ -129,23 +127,6 @@ case "${1:-}" in
     create_cluster hga-hub
     pin hga-hub
     ;;
-  delegate)
-    [ -n "${2:-}" ] || { echo "usage: $0 delegate <name>" >&2; exit 2; }
-    [ -n "${DELEGATE_TOKEN:-}" ] && [ -n "${HARNESS_ACCOUNT_ID:-}" ] ||
-      { echo "$0: DELEGATE_TOKEN and HARNESS_ACCOUNT_ID must be set" >&2; exit 1; }
-    helm repo add harness-delegate \
-      https://app.harness.io/storage/harness-download/delegate-helm-chart/ --force-update >/dev/null
-    # The token only as values on stdin (-f -), never on a command line.
-    jq -n '{delegateToken: env.DELEGATE_TOKEN}' |
-      helm upgrade -i "$2" harness-delegate/harness-delegate-ng \
-        --kube-context "$hub" -n harness-delegate-ng --create-namespace \
-        --set delegateName="$2" \
-        --set accountId="$HARNESS_ACCOUNT_ID" \
-        --set managerEndpoint=https://app.harness.io \
-        --set upgrader.enabled=true \
-        -f - >/dev/null
-    echo "installed delegate $2 on $hub"
-    ;;
   pin)
     shift
     [ $# -gt 0 ] || set -- $(k3d_clusters hga-)
@@ -183,7 +164,7 @@ case "${1:-}" in
     KUBECONFIG="$HOME/.kube/config" k3d cluster delete "$@"
     ;;
   *)
-    echo "usage: $0 hub|delegate <name>|pin [cluster...]|register|spoke <name>|store-key <path>|down [name...]" >&2
+    echo "usage: $0 hub|pin [cluster...]|register|spoke <name>|store-key <path>|down [name...]" >&2
     exit 2
     ;;
 esac

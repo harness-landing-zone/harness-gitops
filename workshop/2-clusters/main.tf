@@ -1,14 +1,13 @@
 # One workspace per cluster: the workspace name is the cluster name, and
 # cluster-values/<workspace>.yaml says what it is. A missing file fails here
 # (the default workspace has none). k3d.sh does the cluster work; this decides
-# what to run and holds the Harness side.
+# what to run and holds the Harness side. hub.tf installs the hub's releases.
 locals {
-  values   = yamldecode(file("${path.module}/cluster-values/${terraform.workspace}.yaml"))
-  name     = terraform.workspace
-  role     = try(local.values.role, "")
-  bu       = try(local.values.bu, "")
-  delegate = local.role == "hub" ? data.terraform_remote_state.setup[0].outputs.hub_delegate_name : ""
-  script   = abspath("${path.module}/k3d.sh")
+  values = yamldecode(file("${path.module}/cluster-values/${terraform.workspace}.yaml"))
+  name   = terraform.workspace
+  role   = try(local.values.role, "")
+  bu     = try(local.values.bu, "")
+  script = abspath("${path.module}/k3d.sh")
   # The spoke's own Harness identity.
   id = "hga_agent_${replace(local.name, "-", "_")}"
   # Where the spoke's key goes in OpenBao (the AWS Secrets Manager secret name
@@ -28,9 +27,10 @@ resource "terraform_data" "values" {
       condition     = local.role != "hub" || local.name == "hub"
       error_message = "The hub's workspace must be named hub."
     }
+    # The environment names the hub agent (hga-<env>-hub, hga_<env>_hub).
     precondition {
-      condition     = local.role != "hub" || can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", local.delegate))
-      error_message = "hub_delegate_name from ../1-harness-setup must be a DNS label."
+      condition     = local.role != "hub" || can(regex("^[a-z0-9]+$", local.env))
+      error_message = "environment_id from ../1-harness-setup must be lowercase letters and digits."
     }
     precondition {
       condition     = local.role != "spoke" || can(regex("^spoke-[a-z0-9]([-a-z0-9]*[a-z0-9])?$", local.name))
@@ -70,7 +70,8 @@ resource "terraform_data" "hub_cluster" {
   depends_on = [terraform_data.values]
 }
 
-# Read the name the connector selects and its token from ../1-harness-setup.
+# The hub's inputs from ../1-harness-setup: the keys, the environment, the
+# platform org and project, and the repository URL.
 data "terraform_remote_state" "setup" {
   count   = local.role == "hub" ? 1 : 0
   backend = "local"
@@ -80,24 +81,6 @@ data "terraform_remote_state" "setup" {
 }
 
 data "harness_platform_current_account" "this" {}
-
-# The hub's delegate, installed again for a new name or a new hub cluster. The
-# token reaches the script only through its environment. Nothing removes the
-# delegate on destroy: it goes with the hub cluster.
-resource "terraform_data" "delegate" {
-  count            = local.role == "hub" ? 1 : 0
-  triggers_replace = [local.delegate, terraform_data.hub_cluster[0].id]
-
-  provisioner "local-exec" {
-    command = "\"${local.script}\" delegate ${local.delegate}"
-    environment = {
-      DELEGATE_TOKEN     = data.terraform_remote_state.setup[0].outputs.delegate_token
-      HARNESS_ACCOUNT_ID = data.harness_platform_current_account.this.account_id
-    }
-  }
-
-  depends_on = [terraform_data.hub_cluster]
-}
 
 # A self-managed spoke runs its own controller, which needs an API key on the
 # spoke. Each spoke gets its own key, scoped to its tenant's org, so no spoke holds
