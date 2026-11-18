@@ -61,7 +61,8 @@ apiKeySecret:
   # manager.apiKeySecretNamespace, default: the controller's release
   # namespace). Empty means this release namespace.
   namespace: ""
-  # Supply only at deploy time from the CD platform's secret manager.
+  # Supply only at install time, never from a file in git (the workshop
+  # passes it with OpenTofu's set_sensitive).
   value: ""
   # More key Secrets in the same namespace, name: value, for example a
   # tenant's org-scoped key. Same supply rule as value.
@@ -95,7 +96,7 @@ gitSecret:
   credsTemplate: false
 
 # Hub self-registration: an Argo CD cluster Secret naming THIS cluster, with
-# the labels the root ApplicationSet selects on. A plain resource, not a hook.
+# the labels the group ApplicationSets select on. A plain resource, not a hook.
 hubCluster:
   enabled: false
   # Argo cluster name AND Secret name.
@@ -104,25 +105,31 @@ hubCluster:
   fleetMember: hub-cluster
   # Extra labels/annotations stamped on the Secret.
   labels: {}
+  # A JSON object of another cluster Secret's labels; only its add-on
+  # switches (keys starting enable_) are copied. Used for a spoke that
+  # installs its own add-ons (groups/agents.yaml, runtime).
+  labelsJson: ""
   annotations: {}
 
-# Root ApplicationSet: one root Application per hub-labelled cluster Secret,
-# syncing a flat folder of ApplicationSets. A post-install/post-upgrade hook,
-# so it can ship in the same release as the Argo CRDs.
+# Root ApplicationSet: the group installer. For each file in groupsPath it
+# makes one Application named after the group, on the hub, which installs charts/application-sets with that file as its values. A
+# post-install/post-upgrade hook, so it can ship in the same release as the
+# Argo CRDs.
 rootAppSet:
   enabled: false
-  name: cluster-application-sets
-  # Which cluster Secrets count as hubs. Never empty.
-  selector:
-    fleet_member: hub-cluster
+  name: groups
   # Empty falls back to gitSecret.url.
   repoURL: ""
-  path: gitops/bootstrap
+  # Folder of group files in that repository: one values file per group.
+  groupsPath: groups
+  # Group files to install, by name without .yaml. Empty = every file.
+  groups: []
+  # Branch, tag or commit for the group files, the chart and what the groups
+  # install from this repository.
   targetRevision: HEAD
-  # Literal destination cluster name instead of the generator placeholder.
-  # Needed only when this chart is rendered through the Harness Argo plugin.
+  # Destination cluster of the group Applications. Empty: hubCluster.name.
   destinationName: ""
-  # AppProject of the root Application.
+  # AppProject of the group Applications and of what the groups generate.
   project: default
   # Also create that AppProject as a hook (weight 0, before the
   # ApplicationSet), with gitopsAgent.appProject.description. Use this instead

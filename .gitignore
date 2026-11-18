@@ -5,3 +5,9 @@
 *.tfstate
 *.tfstate.*
 terraform.tfstate.d/
+# Local inputs and keys: never commit them.
+terraform.tfvars
+*.auto.tfvars
+.env
+*.pem
+.claude/

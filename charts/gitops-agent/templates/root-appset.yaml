@@ -1,9 +1,9 @@
 {{- /* Reference addition (not in the official chart).
-Root ApplicationSet: a clusters generator over hub-labeled cluster Secrets (the
-hubCluster Secret) stamps ONE root Application per hub, syncing a flat folder
-of ApplicationSets to that hub BY NAME. The generated Application pins an
-EXPLICIT directory source, so CMP discovery never go-templates the
-ApplicationSet placeholders it syncs.
+Root ApplicationSet: the group installer. A git files generator over
+rootAppSet.groupsPath stamps ONE Application per group file, named after the
+group, which installs charts/application-sets with that file as its values
+into the hub (hubCluster.name, or rootAppSet.destinationName). The chart
+renders the group's ApplicationSets into this namespace.
 
 Applied as post-install/post-upgrade hooks: hook manifests are built at fire
 time, which is what lets these CRs ship in the SAME release as the Argo CRDs.
@@ -12,17 +12,18 @@ AppProject CRD exists), so with rootAppSet.createProject the AppProject named
 by rootAppSet.project is rendered here too, at weight 0, before the
 ApplicationSet at weight 1. before-hook-creation recreates both on every
 upgrade (absorbing a copy Argo CD or a human created); with
-preserveResourcesOnDeletion that is a metadata blip (generated Applications
-are re-stamped, their children keep running). Argo runtime placeholders are
-backtick-escaped so they reach the appset controller literally. */}}
+preserveResourcesOnDeletion that is a metadata blip (the group Applications
+are re-stamped, the ApplicationSets they track keep running). Argo runtime
+placeholders are backtick-escaped so they reach the appset controller
+literally. */}}
 {{- $as := (.Values).rootAppSet }}
-{{- if and $as $as.enabled .Values.gitopsAgent.enabled }}
+{{- /* enabled may arrive as the string "true" or "false" from an
+ApplicationSet template, so it is compared as text. */}}
+{{- if and $as (eq (toString $as.enabled) "true") .Values.gitopsAgent.enabled }}
 {{- $repoURL := default (.Values.gitSecret).url $as.repoURL }}
+{{- $revision := default "HEAD" $as.targetRevision }}
 {{- if not $repoURL }}
 {{- fail "rootAppSet.repoURL is required when gitSecret.url is not set" }}
-{{- end }}
-{{- if not $as.selector }}
-{{- fail "rootAppSet.selector must not be empty - an empty clusters selector matches EVERY registered cluster, spokes included" }}
 {{- end }}
 {{- if $as.createProject }}
 {{- if .Values.gitopsAgent.appProject.enabled }}
@@ -58,7 +59,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: {{ default "cluster-application-sets" $as.name | quote }}
+  name: {{ default "groups" $as.name | quote }}
   namespace: {{ .Release.Namespace }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
@@ -68,37 +69,52 @@ metadata:
     {{- include "gitops-agent.labels" . | nindent 4 }}
 spec:
   goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   syncPolicy:
     preserveResourcesOnDeletion: true
+    {{- /* Never delete a group's Application: removing a group file leaves
+    its ApplicationSets in place. */}}
+    applicationsSync: create-update
   generators:
-    - clusters:
-        selector:
-          matchLabels:
-            {{- toYaml $as.selector | nindent 12 }}
+    - git:
+        repoURL: {{ $repoURL | quote }}
+        revision: {{ $revision | quote }}
+        files:
+          {{- range (default (list "*") $as.groups) }}
+          - path: {{ printf "%s/%s.yaml" (default "groups" $as.groupsPath) . | quote }}
+          {{- end }}
   template:
     metadata:
-      name: {{ default "cluster-application-sets" $as.name | quote }}
+      name: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+      labels:
+        group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
     spec:
       project: {{ default "default" $as.project | quote }}
-      source:
-        repoURL: {{ $repoURL | quote }}
-        path: {{ default "gitops/bootstrap" $as.path | quote }}
-        targetRevision: {{ default "HEAD" $as.targetRevision | quote }}
-        directory:
-          recurse: false
-          exclude: exclude/*
+      sources:
+        - repoURL: {{ $repoURL | quote }}
+          targetRevision: {{ $revision | quote }}
+          ref: values
+        - repoURL: {{ $repoURL | quote }}
+          targetRevision: {{ $revision | quote }}
+          path: charts/application-sets
+          helm:
+            releaseName: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+            valueFiles:
+              - '$values/{{`{{ .path.path }}/{{ .path.filename }}`}}'
+            valuesObject:
+              group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+              revision: {{ $revision | quote }}
+              project: {{ default "default" $as.project | quote }}
       destination:
         namespace: {{ .Release.Namespace | quote }}
-        {{- /* The backtick form survives exactly ONE Go template pass (helm's),
-        so the ApplicationSet controller receives the literal placeholder.
-        Installed through an Argo Application with the Harness plugin, the CMP
-        runs a second pass and stores "<no value>"; set destinationName to a
-        literal cluster name in that case. */}}
-        {{- if $as.destinationName }}
-        name: {{ $as.destinationName | quote }}
-        {{- else }}
-        name: '{{`{{.name}}`}}'
-        {{- end }}
+        name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
       syncPolicy:
-        automated: {}
+        automated:
+          selfHeal: true
+          {{- /* A group file removed from git leaves its ApplicationSets. */}}
+          prune: false
+        retry:
+          limit: 20
+          backoff:
+            duration: 1m
 {{- end }}

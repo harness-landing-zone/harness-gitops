@@ -1,7 +1,7 @@
 # Every bu1 GitOps agent (spoke cluster Secrets labelled tenant: bu1, any
 # stage). Teams every stage gets are teams/<team>/values.yaml beside this file;
 # a stage folder (nonprod/, prod/) can override them or add its own.
-# Read by spoke-bootstrap/spoke-runtime.yaml. The agent's name, identity,
+# Read by runtime in groups/agents.yaml. The agent's name, identity,
 # Harness org, scope and key come from the cluster Secret, not from here.
 # Plain values only: Argo cannot resolve Harness expressions.
 

@@ -1,8 +1,8 @@
 # People and ownership
 
-> The text of this page matches the repository at commit `0b56780`.
-> [Architecture](architecture.md) is the full description. **The diagram is
-> outdated**: it shows the state of 2026-11-13 and has not been redrawn.
+> This page records the workshop at commit `0b56780`. The diagram records the
+> state of 2026-11-13. See [Architecture](architecture.md) for the grouped
+> bootstrap and current repository layout.
 
 > Status words used on this page: **proven** means run on the local test
 > clusters; **built** means in the repo but not run; **open** means not
@@ -43,7 +43,7 @@ stay on the hub). The table says where the two differ.
 |---|---|---|---|
 | The hub's controller, the account-level API key and each tenant's API key | Hub cluster, namespace `hga-system` | Platform team | proven |
 | Hub agent and its Argo CD | Hub cluster | Platform team | proven |
-| The ApplicationSets and the charts | This repo, `bootstrap/`, `spoke-bootstrap/` and `charts/` | Platform team | proven |
+| The ApplicationSets and the charts | This repo, `groups/` and `charts/` | Platform team | proven |
 | Member file `fleet-members/<cluster>.yaml`: tenant, stage and model of one spoke | This repo | Platform team | proven |
 | Spoke cluster Secret, labelled `tenant` and `stage` | Hub cluster | Platform team; External Secrets builds it from the store and the member file | proven |
 | Tenant files under `tenants/<tenant>/gitops-agents/`: agent values, and one file per team with its Harness project, namespaces and source repos | This repo | Platform team reviews every change | proven; who raises the change is open |

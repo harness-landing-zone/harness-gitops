@@ -1,23 +1,34 @@
 # spoke-test is a fleet member because this file exists. The file name is the
 # cluster's name: its Argo CD cluster Secret on the hub and its OpenBao entry
-# clusters/spoke-test. The store holds only the connection (written by
-# workshop/2-clusters/k3d.sh register); how the cluster is bootstrapped is set
-# here, and bootstrap/cluster-registration.yaml turns it into the cluster
-# Secret's labels.
+# clusters/spoke-test. The connection is written by workshop/2-clusters/k3d.sh
+# register. The fleet group in groups/fleet.yaml reads this file to configure
+# the cluster Secret's labels.
 
 # The tenant that owns this spoke, and the Harness org the agent registers
 # under; its values and teams are in tenants/<tenant>/gitops-agents/. Reviewed
 # like any identity: never change it.
 tenant: bu1
 # The stage folder of tenants/<tenant>/gitops-agents/ (values and teams). There
-# is no test/ folder yet, so the spoke gets the defaults and no teams.
+# is no test/ folder yet, so the spoke gets the default values and teams.
 stage: test
-# true: install a GitOps agent on this cluster (label fleet_member: spoke).
-gitopsAgent: true
-# The model. "" = self-managed: controller, key and agent objects on this
-# spoke. hub = hub-managed: key and agent objects stay on the hub, its
-# controller does the work and ESO pushes the token (label agent_model: hub).
-agentModel: ""
+# agent: install a GitOps agent on this cluster; push: registered only, the
+# hub's Argo CD deploys to it. Stamped as label model.
+model: agent
+# Who installs this spoke's add-ons. hub: the hub's Argo CD pushes them, which
+# is the model in use: the hub does the whole bootstrap and the spoke's agent
+# deploys applications. self (the spoke's own Argo CD installs them) is built
+# but parked. Stamped as label addons.
+addons: hub
+# Where the Harness controller, its key, the agent object and the team
+# mappings live. self = self-managed: all on this spoke. hub (the default) =
+# hub-managed: they stay on the hub, its controller does the work and ESO
+# pushes the token. Stamped as label controller.
+controller: self
+# Extra labels for the cluster Secret. An add-on's switch goes here: whoever
+# installs this spoke's add-ons (see addons above) installs that add-on as
+# <spoke>-<add-on>.
+labels:
+  enable_external_secrets: "true"
 # Self-managed only: the OpenBao path of this spoke's controller key
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =

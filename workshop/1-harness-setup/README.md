@@ -1,73 +1,53 @@
 # 1. Harness setup
 
-One `tofu apply` creates everything Harness needs before the hub can be
-bootstrapped. Nothing here touches a cluster.
+Start with the [workshop guide](../README.md) for prerequisites and commands.
+This stage creates the Harness resources for the hub and the example tenant.
+Stage 2 creates the local hub and installs the controller and hub agent using
+this stage's outputs.
 
 ## What it creates
 
 | Scope | Entity | Identifier |
 |---|---|---|
-| Account | Organization / project | `gitops_reference` / `gitops_admin` |
+| Account | Workshop organization | `gitops_reference` |
+| Workshop organization | Workshop project | `gitops_admin` |
 | Account | Custom role (GitOps agent + Argo project view/edit/delete only) | `hga_controller` |
 | Account | Service account, API key, token, role assignment on `_all_resources_including_child_scopes` | `hga_controller` |
-| Project | Secret text: the controller's token | `HGA-Token` |
-| Project | Secret text: GitHub App JSON for the controller | `hga_github_app` |
-| Project | Secret file: GitHub App key for the connector | `hga_github_app_key` |
-| Project | GitHub connector (GitHub App, API access on) | `hga_github` |
-| Project | Delegate token | `hga_test_hub` |
-| Project | Kubernetes connector (inherits from delegate `hga-test-hub`) | `hga_test_hub` |
-| Project | Environment, 2 infrastructures, 2 services, pipeline, read from `harness/` in this folder | `test`, `hga_system`, `account_agent`, `hga_controller`, `hga_account_agent`, `hga_hub_bootstrap` |
+| Account | Example tenant organization | `bu1` |
+| Tenant | Team projects | `team_a`, `team_b` |
+| Tenant | Controller role, service account, API key, token and role assignment | `hga_controller_bu1` (role, service account, API key and token) |
 
-The environment, infrastructures, services and pipeline are read from the
-`harness/` YAML in this folder at plan time, so edit the YAML, not `entities.tf`.
+The tenant resources are defined in [`business-units.tf`](business-units.tf).
+Stage 2 binds each spoke's own service account to the tenant role
+`hga_controller_<bu>` by name.
 
-## What you need first
+## Outputs for stage 2
 
-- A Harness account and a personal access token that may create orgs, roles
-  and service accounts:
+| Output | Used for |
+|---|---|
+| `controller_token` (sensitive) | Secret `harness-api-key-secret` in `hga-system` |
+| `tenant_controller_tokens` (sensitive) | Secret `harness-api-key-<bu>` in `hga-system`, one per tenant |
+| `environment_id` | The hub agent's name `hga-<env>-hub` and identifier `hga_<env>_hub` |
+| `org_id`, `project_id` | The project the hub's AppProject `default` maps to |
+| `repo_url` | `https://github.com/<github_org>/harness-gitops.git`, the repository the hub's Argo CD follows |
 
-  ```bash
-  export HARNESS_ACCOUNT_ID=<account id>
-  export HARNESS_PLATFORM_API_KEY=<pat>
-  ```
-
-- The GitHub App installed on the repo's GitHub org, with its private key PEM
-  on disk. The Harness connector wants the key in PKCS#8; if yours starts with
-  `BEGIN RSA PRIVATE KEY`, convert a copy and set
-  `github_app_private_key_pkcs8_file` to it:
-
-  ```bash
-  openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in app.pem -out app.pkcs8.pem
-  ```
-
-## Run
-
-```bash
-cp terraform.tfvars.example terraform.tfvars   # fill in the placeholders
-tofu init
-tofu plan
-tofu apply
-```
-
-## Next
-
-1. Install the delegate in the hub cluster: `tofu output -raw delegate_install_command`
-   prints the `helm upgrade -i` command; it reads the token with
-   `tofu output -raw delegate_token`, so run it from this folder.
-2. When the delegate is connected, run the `hga_hub_bootstrap` pipeline.
+The Harness provider reads `HARNESS_ACCOUNT_ID` and
+`HARNESS_PLATFORM_API_KEY` from the environment. Set `account_id` in
+`terraform.tfvars` to the same account as `HARNESS_ACCOUNT_ID`. Stage 2
+expects the default workspace's local state at `terraform.tfstate` in this
+directory.
 
 ## State holds secrets
 
-The service-account token, the delegate token and the GitHub App private key
-end up in Terraform state in plain text. Keep the state private (never commit
-it; use an encrypted, access-controlled backend for anything shared). `.gitignore`
-here keeps local state and `terraform.tfvars` out of git.
+The service-account tokens are stored in state. Keep state and plans private.
+Git ignores local state and `terraform.tfvars`.
 
 ## Already created by hand?
 
-Terraform fails on entities that already exist. Import them, or delete them in
-Harness first. A project-scoped entity imports as `<org_id>/<project_id>/<id>`:
+If a workshop entity already exists in your test account, use the state that
+created it or verify it belongs to this workshop before importing it. For
+example, the workshop project imports by organization and ID.
 
 ```bash
-tofu import harness_platform_connector_kubernetes.hub gitops_reference/gitops_admin/hga_test_hub
+tofu import harness_platform_project.this gitops_reference/gitops_admin
 ```

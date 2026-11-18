@@ -1,5 +1,6 @@
-# The hub: workspace hub. Made by k3d.sh hub, plus the Harness delegate.
+# The hub: workspace hub. Made by k3d.sh hub; hub.tf installs the controller
+# and the hub agent.
 role: hub
-# Must equal hub_delegate_name in ../1-harness-setup: the Kubernetes connector
-# selects the delegate by this name.
-delegateName: local-hub-delegate
+# The branch the hub's root ApplicationSet follows (rootAppSet.targetRevision
+# and the hub cluster Secret's repo_revision annotation).
+revision: main

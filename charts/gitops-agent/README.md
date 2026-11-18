@@ -15,18 +15,22 @@ bootstrap templates, the `HarnessGitopsAgent`, its
 | `root-appset.yaml` | `rootAppSet` | root ApplicationSet (and with `createProject` its AppProject) as hooks |
 
 All four are off by default. Only the hub release (`hub/account-agent.yaml`)
-turns them on; spoke runtimes (`spoke-bootstrap/spoke-runtime.yaml`) use none
-of them.
+turns them on. The runtime entry in `groups/agents.yaml` uses this chart
+for Argo CD and the running agent, and uses `charts/agent-registration` for
+the registration resources. The group uses `charts/teams-bootstrap` for team
+mappings.
 
 ## Why the extras exist
 
-The hub is installed in one Native Helm release with no manual step after it:
+The hub is installed in one Helm release with no manual step after it:
 
-- The controller needs the API key as a Secret; Harness injects it at deploy
-  time into the controller's namespace (`hga-system`).
-- A fresh Argo CD needs a credential for this repo before it can sync anything.
-- The ApplicationSets under `bootstrap/` select the hub by its cluster Secret's
-  labels and read the environment and repo from it.
+- The controller needs the API key as a Secret; the install passes it in and
+  the chart writes it into the controller's namespace (`hga-system`).
+- A fresh Argo CD needs a credential for a private repo before it can sync
+  anything; a public repo needs none.
+- The root ApplicationSet `groups` is the group installer: it makes one
+  Application per file in `groups/`, named after the group, on the hub, from
+  the repository and revision in `rootAppSet`.
 - The root ApplicationSet and its AppProject are Argo CRs. gitops-helm's
   `appProject` template refuses to render until the AppProject CRD exists,
   and this release installs that CRD, so they are post-install hooks here.

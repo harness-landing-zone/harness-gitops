@@ -1,6 +1,6 @@
 {{- /*
 Lets ESO on the hub write into this spoke, for one of two reasons:
-- Hub-managed spoke: the agent's token (charts/fleet-member-registration's PushSecret)
+- Hub-managed spoke: the agent's token (charts/agent-registration's PushSecret)
   goes through push-<cluster>, which only the agent's own hub namespace
   (<cluster>) may use.
 - A self-managed spoke with harnessSecretName: its own controller's API key,
@@ -15,18 +15,19 @@ stays in the store and out of git.
 */}}
 {{- if .Values.externalSecret.enabled }}
 {{- $name := .Values.clusterName }}
-{{- $hub := eq .Values.agentModel "hub" }}
+{{- $agent := eq .Values.model "agent" }}
+{{- $hub := and $agent (eq .Values.controller "hub") }}
 {{- $key := .Values.harnessSecretName }}
 {{- if $key }}
 {{- if $hub }}
-{{- fail "harnessSecretName must be empty with agentModel hub: the hub model puts no API key on the spoke" }}
+{{- fail "harnessSecretName must be empty with controller hub: the hub model puts no API key on the spoke" }}
 {{- end }}
 {{- /* Under harness-api-keys/, where workshop/2-clusters writes keys: never a cluster connection (clusters/). Which key a spoke gets is reviewed in its member file. */}}
 {{- if not (regexMatch "^harness-api-keys/[a-z0-9]([-a-z0-9_/]*[a-z0-9])?$" $key) }}
 {{- fail (printf "harnessSecretName %q must be harness-api-keys/<name>" $key) }}
 {{- end }}
 {{- end }}
-{{- $pushKey := and .Values.gitopsAgent (eq .Values.agentModel "") $key }}
+{{- $pushKey := and $agent (eq .Values.controller "self") $key }}
 {{- if or $hub $pushKey }}
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret

@@ -7,38 +7,47 @@
 secretStore:
   enabled: false
   name: hub-openbao
-# One per fleet member. bootstrap/cluster-registration.yaml turns it on.
+# The fleet group in groups/fleet.yaml enables one per fleet member.
 externalSecret:
   enabled: false
-# The Argo CD cluster name and the cluster Secret name. Set by
-# bootstrap/cluster-registration.yaml from the member file's name; also the OpenBao key clusters/<clusterName>.
+# The Argo CD cluster name and cluster Secret name come from the member file's
+# name in groups/fleet.yaml. OpenBao reads clusters/<clusterName>.
 clusterName: ""
 # The tenant that owns the cluster (its Harness org; a tenant can be a
 # business unit). From the member file.
 tenant: ""
 # The stage label (nonprod, prod, ...). From the member file. Required when
-# gitopsAgent is true.
+# model is agent.
 stage: ""
-# From the member file. true adds the label fleet_member: spoke, which
-# spoke-bootstrap/ and bootstrap/agent-registration.yaml select on.
-gitopsAgent: false
-# Annotations for the cluster Secret. Set by
-# bootstrap/cluster-registration.yaml: repo_url and
-# harness_account_id, copied from the hub cluster Secret.
+# From the member file, required, stamped as label model: agent (the agents
+# group in groups/agents.yaml installs an agent) or push (registered only; the
+# hub's Argo CD deploys to it). Every member gets fleet_member: spoke.
+model: ""
+# From the member file, stamped as label addons: who installs this cluster's
+# add-ons. hub (the default): the hub's Argo CD pushes them. self: the
+# cluster's own Argo CD installs them (model: agent only), reading this
+# repository itself.
+addons: hub
+# From the member file, stamped as label controller: where the Harness
+# controller, its key, the agent object and the team mappings live (model:
+# agent only). hub (the default) = hub-managed: only the hub's controller
+# runs, and the kubeconfig ExternalSecret and push store let ESO push the
+# agent's token to the spoke (templates/push.yaml). self = self-managed: the
+# spoke runs its own controller.
+controller: hub
+# From the member file: extra labels for the cluster Secret. An add-on's
+# switch goes here, for example enable_external_secrets: "true"
+# (groups/addons.yaml). The labels the chart sets itself are refused.
+labels: {}
+# The fleet group in groups/fleet.yaml copies repo_url and harness_account_id
+# from the hub cluster Secret.
 annotations: {}
 # How often ESO re-reads the store (token rotation lands within this time).
 refreshInterval: 1m
-# From the member file (agentModel). "hub" = hub-managed: only the hub's
-# controller runs; the cluster Secret gets the label agent_model: hub, plus the
-# kubeconfig ExternalSecret and push store (templates/push.yaml). Empty =
-# self-managed: the spoke runs its own controller.
-agentModel: ""
-# From the member file. Self-managed spokes (agentModel "") only: the OpenBao
+# From the member file. Self-managed spokes (controller self) only: the OpenBao
 # path of this spoke's own controller key (property api_key), written by
 # workshop/2-clusters (its cluster-values harnessSecretName, the same value);
 # must be under harness-api-keys/. Set = the hub
 # pushes it to the spoke as hga-system/harness-api-key-secret
 # (templates/push.yaml); empty = that Secret is created by hand.
 harnessSecretName: ""
-# How the agent token reaches the spoke. Only push exists; pull is not built.
-tokenDelivery: push

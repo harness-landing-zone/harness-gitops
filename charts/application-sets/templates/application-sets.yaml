@@ -1,0 +1,88 @@
+{{- $group := required "group is required: the installer sets it from the group file's name" .Values.group }}
+{{- range $name, $set := .Values.applicationSets }}
+{{- if ne $set.enabled false }}
+{{- /* Sources: either the entry's own list, or built from the add-on form. */}}
+{{- $sources := list }}
+{{- if or $set.chartName $set.path }}
+{{- if $set.sources }}
+{{- fail (printf "%s: set sources or the add-on form (chartName or path), not both" $name) }}
+{{- end }}
+{{- $helm := dict "releaseName" (default $set.chartName $set.releaseName) }}
+{{- if not $helm.releaseName }}
+{{- fail (printf "%s: releaseName is required with path" $name) }}
+{{- end }}
+{{- with $.Values.addonValueFiles }}
+{{- $sources = append $sources (dict "ref" "values") }}
+{{- $folder := default (base (default "" $set.path)) $set.chartName }}
+{{- $files := list }}
+{{- range . }}
+{{- $files = append $files (printf "$values/%s/%s/values.yaml" . $folder) }}
+{{- end }}
+{{- $_ := set $helm "ignoreMissingValueFiles" true }}
+{{- $_ := set $helm "valueFiles" $files }}
+{{- end }}
+{{- with $set.valuesObject }}
+{{- $_ := set $helm "valuesObject" . }}
+{{- end }}
+{{- if $set.chartName }}
+{{- $sources = append $sources (dict
+      "repoURL" (required (printf "%s: chartRepository is required" $name) $set.chartRepository)
+      "chart" $set.chartName
+      "targetRevision" (required (printf "%s: defaultVersion is required" $name) $set.defaultVersion)
+      "helm" $helm) }}
+{{- else }}
+{{- $sources = append $sources (dict "path" $set.path "helm" $helm) }}
+{{- end }}
+{{- $sources = concat $sources (default (list) $set.additionalSources) }}
+{{- else }}
+{{- $sources = required (printf "%s: sources, chartName or path is required" $name) $set.sources }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ $name }}
+  labels:
+    group: {{ $group }}
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    {{- toYaml $.Values.syncPolicyAppSet | nindent 4 }}
+  {{- $clusters := dict "clusters" (dict "selector" (required (printf "%s: selector is required" $name) $set.selector)) }}
+  generators:
+    {{- if $set.gitFiles }}
+    - matrix:
+        generators:
+          {{- toYaml (list $clusters) | nindent 10 }}
+          - git:
+              repoURL: {{ $.Values.repoURL | quote }}
+              revision: {{ $.Values.revision | quote }}
+              files:
+                - path: {{ $set.gitFiles | quote }}
+    {{- else }}
+    {{- toYaml (list $clusters) | nindent 4 }}
+    {{- end }}
+  template:
+    metadata:
+      name: {{ required (printf "%s: name is required" $name) $set.name | quote }}
+      labels:
+        {{- toYaml (merge (dict "group" $group) (deepCopy (default (dict) $set.labels)) $.Values.labels) | nindent 8 }}
+    spec:
+      project: {{ $.Values.project }}
+      destination:
+        name: {{ dig "name" "{{ .name }}" $set.destination | quote }}
+        namespace: {{ required (printf "%s: destination.namespace is required" $name) $set.destination.namespace | quote }}
+      {{- $sp := deepCopy $.Values.syncPolicy }}
+      {{- with $set.syncOptions }}
+      {{- $_ := set $sp "syncOptions" . }}
+      {{- end }}
+      syncPolicy:
+        {{- toYaml $sp | nindent 8 }}
+      sources:
+        {{- range $sources }}
+        -
+          {{- toYaml (merge (deepCopy .) (dict "repoURL" $.Values.repoURL "targetRevision" $.Values.revision)) | nindent 10 }}
+        {{- end }}
+{{- end }}
+{{- end }}

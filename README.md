@@ -8,19 +8,20 @@ One account-level agent on a **hub** cluster deploys an agent onto every
 **spoke** cluster, from files in this repo. Adding a cluster is one member
 file. Adding a team is one team file.
 
-**[docs/architecture.md](docs/architecture.md) is the full description**: who
-holds what, every step from an empty machine, what has run and what has not,
-and the open questions. This README is the short version.
+Start with the **[local workshop](workshop/README.md)** to set up a test
+Harness project, bootstrap a k3d hub, and verify a spoke. For resource flow,
+ownership and validation history, see the [architecture](docs/architecture.md).
 
 ## Status
 
-Everything here has run only on local k3d clusters. Today that is one hub and
-one spoke, `spoke-test`. Two models exist for a spoke's agent:
+Previous workshop runs used one local k3d hub and one spoke, `spoke-test`.
+The grouped bootstrap has been rendered locally with Helm. Live validation is pending.
+Two models exist for a spoke's agent:
 
 | Model | Member file | Where the controller and the Harness API key are | State |
 |---|---|---|---|
-| Self-managed | `agentModel: ""` | On the hub and on every spoke. Each spoke has its own key, which the hub pushes to it. | Running on `spoke-test` |
-| Hub-managed | `agentModel: hub` | On the hub only. External Secrets pushes the agent's own token to the spoke. | No fleet member uses it. It ran on one spoke that has been removed. |
+| Self-managed | `controller: self` | On the hub and on every spoke. Each spoke has its own key, which the hub pushes to it. | Ran on `spoke-test` in the earlier workshop |
+| Hub-managed | `controller: hub` (the default) | On the hub only. External Secrets pushes the agent's own token to the spoke. | No fleet member uses it. It ran on one spoke that has been removed. |
 
 Hub-managed is the intended one: Harness API access belongs to the hub, and
 a spoke only does GitOps.
@@ -51,55 +52,42 @@ flowchart LR
 ## Layout
 
 ```
-bootstrap/          applied by the hub's root Application: ESO, OpenBao,
-                    cluster registration, agent registration (hub-managed), spokes
-spoke-bootstrap/    ApplicationSets that install on spokes: controller
-                    (self-managed only), runtime, teams
-fleet-members/      one file per spoke: tenant, stage, gitopsAgent, agentModel,
+groups/             addons, fleet registration, and spoke agent group values
+fleet-members/      one file per spoke: tenant, stage, model, controller,
                     harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
   defaults/         values for every spoke of the tenant
   defaults/teams/   one file per team, for every spoke of the tenant
   <stage>/          values, and optionally teams, for one stage
-charts/             the official controller chart, gitops-agent (wraps the
-                    official gitops-helm), cluster-registration,
-                    fleet-member-registration, teams-bootstrap
-hub/                values for the Day 0 pipeline
-addons/hub/         values for the hub's add-ons (OpenBao)
-workshop/1-harness-setup/   OpenTofu for every Harness entity, and the pipeline
-workshop/2-clusters/        OpenTofu and k3d.sh for the local test clusters
+charts/             application-sets, the official controller chart, gitops-agent
+                    (wraps the official gitops-helm), cluster-registration,
+                    agent-registration, teams-bootstrap
+hub/                static values for the hub's day-0 install
+addons/defaults/    values for the add-ons (OpenBao); addons/clusters/<cluster>/ per cluster
+workshop/README.md         local workshop and verification
+workshop/1-harness-setup/   OpenTofu for the shared Harness entities
+workshop/2-clusters/        OpenTofu and k3d.sh: the local test clusters and the hub install
 docs/               the architecture document, an older page on people and
                     ownership, diagrams
 ```
 
-Only files under `hub/` may use Harness expressions. Everything else is
-rendered by Argo CD, which cannot resolve them.
+The files under `hub/` hold only static values. OpenTofu adds the per-hub
+inputs and the keys when it installs the hub (`workshop/2-clusters/hub.tf`).
+
+The `fleet` group uses `cluster-registration` to set up the Argo CD connection
+to each spoke on the hub. The `agents` group uses `agent-registration` to
+render the spoke's `HarnessGitopsAgent` and related resources, and `gitops-agent`
+to run Argo CD and the agent on the spoke.
 
 ## From zero to a hub
 
-1. Create the Harness entities: `tofu apply` in
-   [workshop/1-harness-setup/](workshop/1-harness-setup/README.md). It needs a
-   Harness account, a personal access token and a GitHub App installed on
-   this repo.
-2. Have a cluster for the hub with a Harness delegate in it. For a local k3d
-   hub, the `hub` workspace of
-   [workshop/2-clusters/](workshop/2-clusters/README.md) creates both.
-3. Push this repo to `main`. The pipeline fetches charts and values from there.
-4. Run pipeline `hga_hub_bootstrap` with input set `hga_hub_bootstrap_test`.
-   It installs the controller into `hga-system`, then the hub agent with its
-   Argo CD into `hga-hub-agent`.
-5. The hub's Argo CD then applies `bootstrap/` by itself: External Secrets
-   Operator, OpenBao with its store, and the ApplicationSets that register
-   and bootstrap spokes.
-
-Check:
-
-```bash
-kubectl -n hga-hub-agent get applications,applicationsets
-```
-
-The hub agent shows CONNECTED and HEALTHY in Harness.
+Follow the [workshop guide](workshop/README.md) for prerequisites, commands,
+and verification. The first OpenTofu stage creates the Harness
+entities. The second creates the local hub and installs the controller, the
+hub agent and Argo CD on it; Argo CD then bootstraps the groups. The hub
+follows the branch named by `revision` in
+`workshop/2-clusters/cluster-values/hub.yaml`.
 
 ## Add a cluster with an agent
 
@@ -110,13 +98,14 @@ Self-managed:
    Harness API key at `harness-api-keys/<cluster>` (property `api_key`). For a
    local k3d spoke, [workshop/2-clusters/](workshop/2-clusters/README.md)
    creates the cluster and the key and writes both entries.
-2. Commit `fleet-members/<cluster>.yaml`:
+2. Commit `fleet-members/<cluster>.yaml` on the branch the hub follows:
 
    ```yaml
    tenant: bu1        # the Harness org
    stage: test        # which values and teams it gets
-   gitopsAgent: true  # install an agent
-   agentModel: ""     # "" = self-managed, hub = hub-managed
+   model: agent       # install an agent (push: registered only)
+   addons: hub        # the hub pushes this cluster's add-ons
+   controller: self   # self = self-managed, hub = hub-managed
    harnessSecretName: harness-api-keys/<cluster>   # the key the hub pushes
    ```
 
@@ -131,7 +120,7 @@ them together.
 Without `harnessSecretName`, create Secret `harness-api-key-secret` in
 namespace `hga-system` on the spoke by hand.
 
-With `agentModel: hub`, leave `harnessSecretName` out: no key and no
+With `controller: hub`, leave `harnessSecretName` out: no key and no
 controller go to the spoke. See the architecture document for what that model
 installs where, and for what is not proven.
 
@@ -160,17 +149,15 @@ only the spokes of that stage. Namespaces must start with `<team>-`.
   and with it the hub's access to the spoke.
 - No old `<cluster>-agent-token` Secret may exist where a controller is about
   to register an agent. The controller never overwrites one.
-- OpenBao runs in dev mode and is empty after every restart. Write the cluster
-  connections and the keys again; `workshop/2-clusters/README.md` has the two
-  commands.
+- OpenBao runs in dev mode and is empty after every restart. Restore the
+  cluster connections and keys using the
+  [restart instructions](workshop/2-clusters/README.md#after-a-hub-restart).
 - An ApplicationSet that matches nothing still reports success. Check
-  `kubectl get applications`.
-- Harness expressions in comments under `hub/` are evaluated. Never write
-  expression syntax in a comment there.
+  `kubectl --context k3d-hga-hub -n hga-hub-agent get applications`.
 - The hub holds cluster-admin on every spoke.
-- This repo's own charts and values follow `HEAD` of `main`; nothing is pinned
-  per stage. Only the two upstream charts are pinned (ESO `2.15.0`, OpenBao
-  `0.30.7`).
+- The hub follows one branch for the group files, its own charts and their
+  values (`revision`, default `main`). The upstream charts are pinned to ESO `2.15.0` and
+  OpenBao `0.30.7`.
 
 ## Not included yet
 

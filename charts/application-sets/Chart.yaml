@@ -1,0 +1,5 @@
+apiVersion: v2
+name: application-sets
+description: Renders one Argo CD ApplicationSet per values entry, in the style of EKS Fleet Management's application-sets chart, reduced to what this repo needs.
+type: application
+version: 0.1.0
