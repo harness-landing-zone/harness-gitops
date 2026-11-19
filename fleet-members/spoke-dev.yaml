@@ -33,4 +33,4 @@ labels:
 # (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
 # The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =
 # that Secret is created by hand. Must stay empty when hub-managed.
-harnessSecretName: harness-api-keys/spoke-test
+harnessSecretName: harness-api-keys/spoke-dev
