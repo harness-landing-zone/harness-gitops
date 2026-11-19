@@ -28,24 +28,9 @@ already contains the `spoke-test` member file.
 
 ## Destroy the local infrastructure
 
-Complete remote offboarding while the controllers and their credentials are
-still available. Confirm the workshop agent registrations and their project
-mappings have been cleaned up in Harness. From `workshop/2-clusters`, review
-and destroy each workshop spoke workspace. For the default workshop spoke,
-run the following.
-
-```bash
-tofu workspace select spoke-test && tofu destroy
-```
-
-Once all workshop spoke destroys have succeeded, review and destroy the hub
-workspace. It uninstalls the `hga-hub-agent` release first, while the
-controller still runs, so the controller deregisters the hub agent in
-Harness; then the controller release, then the cluster.
-
-```bash
-tofu workspace select hub && tofu destroy
-```
+Follow the [workshop teardown](../README.md#5-tear-down-the-workshop) to
+remove the GitOps mappings and agents in Harness before destroying the spoke
+and hub workspaces.
 
 ## After a hub restart
 

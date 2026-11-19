@@ -1,9 +1,5 @@
 # Harness GitOps Agents reference architecture
 
-A reference architecture for running Harness GitOps Agents on many clusters
-with the official HGA controller (`harness/gitops-agent-bootstrap-controller`),
-modelled on EKS Fleet Management.
-
 One account-level agent on a **hub** cluster deploys an agent onto every
 **spoke** cluster, from files in this repo. Adding a cluster is one member
 file. Adding a team is one team file.

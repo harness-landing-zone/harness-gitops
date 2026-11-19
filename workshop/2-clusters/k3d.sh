@@ -52,6 +52,7 @@ create_cluster() {
   k3d cluster list "$1" >/dev/null 2>&1 ||
     k3d cluster create "$1" \
       --network hga \
+      --api-port 127.0.0.1:random \
       --k3s-arg "--disable=traefik@server:0" \
       --kubeconfig-update-default=false \
       --kubeconfig-switch-context=false \

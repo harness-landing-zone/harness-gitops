@@ -92,7 +92,9 @@ The controller's role, service account and key are named `hga_controller` at acc
 
 ## 2. Create the hub
 
-The hub and spoke share the `hga` Docker bridge. The cluster script pins container IPs, so create the bridge with an explicitly selected IPv4 subnet. Check for an existing network, local clusters, and subnet overlaps before creating anything:
+The hub and spoke share the `hga` Docker bridge. For each newly created cluster, k3d publishes the Kubernetes API on `127.0.0.1` with an automatically selected port and writes that endpoint to kubeconfig. The hub reaches the spoke API over the shared bridge.
+
+The cluster script pins container IPs, so create the bridge with an explicitly selected IPv4 subnet. Check for an existing network, local clusters, and subnet overlaps before creating anything:
 
 ```bash
 docker info --format '{{.Name}}'
@@ -140,9 +142,12 @@ The root ApplicationSet retries until the credential is there.
 ## 3. Verify the hub and its secret store
 
 ```bash
+kubectl --context k3d-hga-hub get --raw='/readyz'
 kubectl --context k3d-hga-hub -n hga-system get pods
 kubectl --context k3d-hga-hub -n hga-hub-agent get harnessgitopsagent hga-test-hub \
   -o jsonpath='{.status.agentIdentifier}{"\n"}'
+kubectl --context k3d-hga-hub -n hga-hub-agent wait --for=condition=Healthy \
+  harnessgitopsagents.gitops.harness.io/hga-test-hub --timeout=5m
 kubectl --context k3d-hga-hub -n hga-hub-agent wait --for=condition=Ready \
   harnessgitopsprojectmappings.gitops.harness.io/hub-admin --timeout=5m
 kubectl --context k3d-hga-hub -n hga-hub-agent get applicationset groups
@@ -150,7 +155,7 @@ kubectl --context k3d-hga-hub -n hga-hub-agent get application addons fleet agen
   -o 'custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISIONS:.spec.sources[*].targetRevision'
 ```
 
-Expect the agent identifier `hga_test_hub`, the `hub-admin` mapping Ready, and the three group Applications `addons`, `fleet` and `agents` **Synced** at your `revision`. The add-on Applications `hub-cluster-external-secrets` and `hub-cluster-openbao` should be **Synced** and **Healthy**. The example `spoke-test-registration` Application may report a missing secret until you add the optional spoke.
+Expect `ok` from `/readyz`, agent `hga_test_hub` **Healthy**, the `hub-admin` mapping **Ready**, and the three group Applications `addons`, `fleet` and `agents` **Synced** at your `revision`. The add-on Applications `hub-cluster-external-secrets` and `hub-cluster-openbao` should be **Synced** and **Healthy**. The example `spoke-test-registration` Application may report a missing secret until you add the optional spoke.
 
 ```bash
 kubectl --context k3d-hga-hub -n hga-hub-agent get applications
@@ -173,10 +178,96 @@ kubectl --context k3d-hga-hub -n hga-hub-agent get secret spoke-test
 kubectl --context k3d-hga-hub -n hga-hub-agent get applications -l cluster=spoke-test
 kubectl --context k3d-hga-spoke-test -n spoke-test get \
   pods,appprojects,harnessgitopsagents,harnessgitopsprojectmappings
+kubectl --context k3d-hga-spoke-test -n spoke-test wait --for=condition=Healthy \
+  harnessgitopsagents.gitops.harness.io/spoke-test --timeout=5m
 kubectl --context k3d-hga-spoke-test -n spoke-test wait --for=condition=Ready \
   harnessgitopsprojectmappings.gitops.harness.io --all --timeout=5m
 ```
 
 If the spoke namespace or CRDs are still being created, wait for `spoke-test-controller`, `spoke-test-runtime` and `spoke-test-teams` to appear on the hub and retry the spoke checks. In Harness, verify `spoke_test` (`spoke-test`) is connected and healthy in org `bu1`, with mappings for `team-a` and `team-b` to projects `team_a` and `team_b`.
 
-OpenBao runs in dev mode and loses its entries on restart. See the cluster notes for workspace cleanup and restoring those entries. [Local cluster details](2-clusters/README.md)
+OpenBao runs in dev mode and loses its entries on restart. [Restore the entries after a hub restart](2-clusters/README.md#after-a-hub-restart).
+
+## 5. Tear down the workshop
+
+Run these steps from the original checkout with its OpenTofu state, the same Harness account and input values, and a valid Harness PAT. The examples use the default workshop names. Substitute the cluster, agent, and mapping names you deployed if you customized them. Review each destroy plan and continue only if every resource it lists belongs to this workshop.
+
+If you only completed step 1, go to [Delete the Harness setup and Docker network](#delete-the-harness-setup-and-docker-network).
+
+### Offboard the example spoke
+
+Skip this step if you skipped step 4. Keep both clusters running. Pause the hub's Argo CD application controller so it cannot restore the spoke's mappings or agent during cleanup. The Harness controller stays running to delete the corresponding registrations and mappings in Harness.
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+kubectl --context k3d-hga-hub -n hga-hub-agent scale \
+  statefulset/argocd-application-controller --replicas=0 &&
+  kubectl --context k3d-hga-hub -n hga-hub-agent wait --for=delete \
+    pod/argocd-application-controller-0 --timeout=2m
+```
+
+Delete the team mappings first and wait for their finalizers, then delete the agent.
+
+```bash
+kubectl --context k3d-hga-spoke-test -n spoke-test delete \
+  harnessgitopsprojectmappings.gitops.harness.io team-a team-b \
+  --ignore-not-found --wait=true --timeout=5m &&
+  kubectl --context k3d-hga-spoke-test -n spoke-test delete \
+    harnessgitopsagents.gitops.harness.io/spoke-test \
+    --ignore-not-found --wait=true --timeout=5m
+```
+
+Check Harness GitOps in the `bu1` organization for removal of the `spoke_test` agent and its mappings. Once they are gone, destroy the spoke workspace. OpenTofu deletes the spoke cluster and its Harness service account, role assignment, API key, and token. Repeat the offboarding and destroy steps for any additional workshop spokes before removing the hub.
+
+```bash
+unset TF_WORKSPACE
+tofu -chdir=workshop/2-clusters workspace select spoke-test &&
+  tofu -chdir=workshop/2-clusters plan -destroy &&
+  tofu -chdir=workshop/2-clusters destroy
+```
+
+### Offboard and delete the hub
+
+Keep the hub controller and Stage 1 credentials available while you delete the hub's admin mapping and agent.
+
+```bash
+export KUBECONFIG="$HOME/.kube/config"
+kubectl --context k3d-hga-hub -n hga-hub-agent delete \
+  harnessgitopsprojectmappings.gitops.harness.io/hub-admin \
+  --ignore-not-found --wait=true --timeout=5m &&
+  kubectl --context k3d-hga-hub -n hga-hub-agent delete \
+    harnessgitopsagents.gitops.harness.io/hga-test-hub \
+    --ignore-not-found --wait=true --timeout=5m
+```
+
+Check Harness GitOps at account scope for removal of the `hga_test_hub` agent and its admin mapping. If a deletion times out or a registration remains, resolve it while the controller and credentials are still available. Once cleanup is complete, destroy the hub workspace. OpenTofu uninstalls the Helm releases and removes `hga-hub`.
+
+```bash
+unset TF_WORKSPACE
+tofu -chdir=workshop/2-clusters workspace select hub &&
+  tofu -chdir=workshop/2-clusters plan -destroy &&
+  tofu -chdir=workshop/2-clusters destroy
+```
+
+### Delete the Harness setup and Docker network
+
+With the workshop clusters removed, destroy the Stage 1 `default` workspace. This removes the workshop organizations and projects in its state, plus the controller roles, role assignments, service accounts, API keys, and tokens it created. Confirm in Harness that the workshop organizations and projects are gone.
+
+```bash
+unset TF_WORKSPACE
+tofu -chdir=workshop/1-harness-setup workspace select default &&
+  tofu -chdir=workshop/1-harness-setup plan -destroy &&
+  tofu -chdir=workshop/1-harness-setup destroy
+```
+
+Use `k3d cluster list` to confirm the workshop clusters are gone. If you created `hga` for this workshop and it has no attached containers, remove the bridge.
+
+```bash
+docker network inspect hga --format 'attached={{len .Containers}}'
+```
+
+If it reports `attached=0`, run:
+
+```bash
+docker network rm hga
+```

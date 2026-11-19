@@ -42,6 +42,13 @@ directory.
 The service-account tokens are stored in state. Keep state and plans private.
 Git ignores local state and `terraform.tfvars`.
 
+## Delete the Harness resources
+
+Follow the [workshop teardown](../README.md#5-tear-down-the-workshop).
+Destroy Stage 1 after offboarding the agents and destroying the spoke and
+hub workspaces, so their controllers can use the Harness credentials during
+cleanup.
+
 ## Already created by hand?
 
 If a workshop entity already exists in your test account, use the state that
