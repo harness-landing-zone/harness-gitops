@@ -49,7 +49,7 @@ if [ ! -e workshop/1-harness-setup/terraform.tfvars ]; then
 fi
 ```
 
-Edit the copy: set `account_id` to the same value as `HARNESS_ACCOUNT_ID`, and `github_org` to your fork's owner if you use a fork.
+Edit the copy: set `account_id` to the same value as `HARNESS_ACCOUNT_ID`, and `github_org` to your fork's owner if you use a fork or export TF_VAR_harness_account_id="YOUR_HARNESS_ACCOUNT_ID"
 
 ```hcl
 account_id = "YOUR_HARNESS_ACCOUNT_ID"
