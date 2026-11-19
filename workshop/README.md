@@ -165,22 +165,22 @@ kubectl --context k3d-hga-hub wait --for=condition=Ready clustersecretstore/hub-
 
 In Harness GitOps, confirm agent `hga_test_hub` (`hga-test-hub`) is connected and healthy at account scope and the hub's `default` AppProject is mapped to `gitops_reference/gitops_admin`.
 
-## 4. Add the example spoke (optional)
+## 4. Add the example spoke
 
 Once OpenBao and `hub-openbao` are ready, apply the `spoke-test` workspace. It creates `hga-spoke-test`, adds `k3d-hga-spoke-test` to your kubeconfig and writes the cluster connection and its org-scoped controller key to OpenBao. The repository already contains [`fleet-members/spoke-test.yaml`](../fleet-members/spoke-test.yaml), so the hub can discover the spoke as soon as the store entries are available.
 
 ```bash
-tofu -chdir=workshop/2-clusters workspace select -or-create spoke-test
+tofu -chdir=workshop/2-clusters workspace select -or-create spoke-dev
 tofu -chdir=workshop/2-clusters apply
 kubectl --context k3d-hga-hub -n hga-hub-agent wait --for=condition=Ready \
-  externalsecret/spoke-test --timeout=5m
-kubectl --context k3d-hga-hub -n hga-hub-agent get secret spoke-test
-kubectl --context k3d-hga-hub -n hga-hub-agent get applications -l cluster=spoke-test
-kubectl --context k3d-hga-spoke-test -n spoke-test get \
+  externalsecret/spoke-dev --timeout=5m
+kubectl --context k3d-hga-hub -n hga-hub-agent get secret spoke-dev
+kubectl --context k3d-hga-hub -n hga-hub-agent get applications -l cluster=spoke-dev
+kubectl --context k3d-hga-spoke-dev -n spoke-dev get \
   pods,appprojects,harnessgitopsagents,harnessgitopsprojectmappings
-kubectl --context k3d-hga-spoke-test -n spoke-test wait --for=condition=Healthy \
+kubectl --context k3d-hga-spoke-dev -n spoke-dev wait --for=condition=Healthy \
   harnessgitopsagents.gitops.harness.io/spoke-test --timeout=5m
-kubectl --context k3d-hga-spoke-test -n spoke-test wait --for=condition=Ready \
+kubectl --context k3d-hga-spoke-dev -n spoke-dev wait --for=condition=Ready \
   harnessgitopsprojectmappings.gitops.harness.io --all --timeout=5m
 ```
 
