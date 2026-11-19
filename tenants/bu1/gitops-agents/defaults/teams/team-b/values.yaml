@@ -1,4 +1,4 @@
-# Team b on every bu1 spoke (any stage): everything about the team in one file, read by
+# Team b on every bu1 spoke (any environment): everything about the team in one file, read by
 # charts/teams-bootstrap. Keyed by the team name, so every team file merges
 # into one map. The name is the AppProject, the mapping and the prefix of
 # every namespace.

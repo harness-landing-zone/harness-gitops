@@ -38,7 +38,7 @@ today. Both are described below.
 | Spoke | A workload cluster with its own Argo CD and agent. |
 | Fleet member, member file | A cluster is a fleet member because `fleet-members/<cluster>.yaml` exists. The file name is the cluster's name. |
 | Tenant | Who owns a spoke. One Harness org. A business unit can be a tenant; `bu1` is the example. |
-| Stage | A spoke's level, for example `test`, `nonprod` or `prod`. Chooses which values and which teams a spoke gets. |
+| Environment | A spoke's level, for example `test`, `nonprod` or `prod`. Chooses which values and which teams a spoke gets. |
 | Environment | The Harness Environment the hub was bootstrapped with (`test`). The word is not used for spokes. |
 | Team | One Harness project in the tenant's org, one Argo CD AppProject on the spoke. |
 | Controller | The Harness GitOps Agent controller (`charts/harness-gitops-agent-controller`). It registers agents and project mappings in Harness, using an API key. |
@@ -56,14 +56,14 @@ groups/
   addons.yaml   ESO and OpenBao on the hub
   fleet.yaml    one Application per member file to register its cluster Secret
   agents.yaml   spoke controller, runtime and teams, plus hub-managed agent registration
-fleet-members/<cluster>.yaml  one file per spoke: tenant, stage, model,
+fleet-members/<cluster>.yaml  one file per spoke: tenant, environment, model,
                               controller, harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
   defaults/values.yaml                values for every agent of the tenant
   defaults/teams/<team>/values.yaml   a team on every spoke of the tenant
-  <stage>/values.yaml                 values for one stage (optional)
-  <stage>/teams/<team>/values.yaml    a team on one stage only (optional)
+  <environment>/values.yaml                 values for one environment (optional)
+  <environment>/teams/<team>/values.yaml    a team on one environment only (optional)
 charts/
   application-sets           renders ApplicationSets from one group file per release
   harness-gitops-agent-controller   the official controller chart, unchanged
@@ -93,7 +93,18 @@ docs/               this document, an older page on people and ownership, diagra
 | Placeholder AppProjects | None | Hub: one deny-all AppProject per team (see caveat 2) |
 | Argo CD and the agent pod | Spoke | Spoke |
 | Team namespaces and real AppProjects | Spoke | Spoke |
-| Spoke connection with cluster-admin | Hub: the cluster Secret and the store, plus a kubeconfig Secret for ESO when the key is pushed | Hub: the cluster Secret and the store, plus a kubeconfig Secret for ESO |
+| Spoke connection with cluster-admin | Hub: the cluster Secret and the store, plus `<spoke>-eso-push-kubeconfig` when ESO pushes the key | Hub: the cluster Secret and the store, plus `<spoke>-eso-push-kubeconfig` for ESO |
+
+Spoke member files use `environment` for values and team selection. Older
+files with `stage` still render and receive the `environment` label when
+their registration Application syncs.
+
+For an existing spoke, the registration Application creates the new
+`<spoke>-eso-push-kubeconfig` ExternalSecret before updating its push store.
+After the new ExternalSecret and push store report Ready and the credential
+push succeeds, remove the old `<spoke>-kubeconfig` ExternalSecret. Its owned
+Secret is removed with it. The registration Application preserves old
+resources until that cleanup.
 
 Caveats that apply to the design, not to a missing step:
 
@@ -157,9 +168,9 @@ The fleet group waits for member files and the corresponding OpenBao entries.
 |---|---|---|---|
 | 1 | A person, OpenTofu | Only for a new tenant: its org, team projects, role and tenant key (`workshop/1-harness-setup/business-units.tf`). | Harness |
 | 2 | A person, OpenTofu | Adds `workshop/2-clusters/cluster-values/<cluster>.yaml` (`role: spoke`, the tenant's org under the key `bu`, optionally `harnessSecretName`) and runs `tofu apply` in workspace `<cluster>`. The name must be `spoke-<name>`. That creates the k3d cluster `hga-<cluster>`, ServiceAccount `argocd-manager` with cluster-admin on it, and the spoke's own service account, API key and token in the tenant's org. It writes the connection into the store at `clusters/<cluster>` and the key at `harness-api-keys/<cluster>`. | Laptop, spoke, Harness, hub |
-| 3 | A person | Commits `fleet-members/<cluster>.yaml` with `tenant`, `stage`, `model: agent`, `controller: self` and `harnessSecretName: harness-api-keys/<cluster>`. | Git |
-| 4 | Hub Argo CD | `registration` makes Application `<cluster>-registration` in `hga-hub-agent`: an ExternalSecret for the cluster Secret and, because `harnessSecretName` is set, what pushes the key (a kubeconfig ExternalSecret, an ExternalSecret for the key, `ClusterSecretStore` `push-<cluster>-hga-system` and a `PushSecret`). | Hub |
-| 5 | ESO | Builds the cluster Secret `<cluster>`: the connection from the store, labels `fleet_member: spoke`, `model`, `addons`, `controller`, `tenant`, `stage` from the member file, annotations copied from the hub. | Hub |
+| 3 | A person | Commits `fleet-members/<cluster>.yaml` with `tenant`, `environment`, `model: agent`, `controller: self` and `harnessSecretName: harness-api-keys/<cluster>`. | Git |
+| 4 | Hub Argo CD | `registration` makes Application `<cluster>-registration` in `hga-hub-agent`. It creates an ExternalSecret for the cluster Secret. When `harnessSecretName` is set, it also creates the `<cluster>-eso-push-kubeconfig` ExternalSecret, the ExternalSecret for the key, the `push-<cluster>-hga-system` store and a PushSecret. | Hub |
+| 5 | ESO | Builds the cluster Secret `<cluster>`: the connection from the store, labels `fleet_member: spoke`, `model`, `addons`, `controller`, `tenant`, `environment` from the member file, annotations copied from the hub. | Hub |
 | 6 | Hub Argo CD | The labels make three Applications for the spoke: `<cluster>-controller`, `<cluster>-runtime`, `<cluster>-teams`. | Hub to spoke |
 | 7 | Hub Argo CD | `<cluster>-controller` installs the controller and its CRDs into `hga-system`. | Spoke |
 | 8 | ESO | Pushes the key to the spoke as `harness-api-key-secret` in `hga-system`. It retries until step 7 has created the namespace. | Hub to spoke |
@@ -168,13 +179,13 @@ The fleet group waits for member files and the corresponding OpenBao entries.
 | 11 | Hub Argo CD | `<cluster>-teams`: for each team file, the team's namespaces, its AppProject and its mapping. The controller marks the mapping Ready once the agent is healthy. | Spoke |
 
 Every Application of a cluster is named `<cluster>-<thing>` and carries the
-labels `cluster`, `tenant` and `stage`. In the Harness GitOps list a cluster's
+labels `cluster`, `tenant` and `environment`. In the Harness GitOps list a cluster's
 Applications therefore sort together, and the label filter `cluster:<name>`
 returns all of them. [live]
 
 What is live and what is not:
 
-- `spoke-test` (tenant `bu1`, stage `test`) is the only fleet member. Its
+- `spoke-test` (tenant `bu1`, environment `test`) is the only fleet member. Its
   four Applications and the hub's four are Synced and Healthy, its agent is
   healthy, and both team mappings are verified. [live]
 - `spoke-test` was registered from nothing: ESO created its cluster Secret.
@@ -235,11 +246,11 @@ Applications that teams created on the old agent are not covered by this plan.
    namespaces and the destinations:
    `tenants/<tenant>/gitops-agents/defaults/teams/<team>/values.yaml` for
    every spoke of the tenant, or
-   `tenants/<tenant>/gitops-agents/<stage>/teams/<team>/values.yaml` for one
-   stage.
+   `tenants/<tenant>/gitops-agents/<environment>/teams/<team>/values.yaml` for one
+   environment.
 3. `<cluster>-teams` applies it on every spoke it covers.
 
-`bu1` has `team-a` and `team-b` under `defaults/teams/`. No stage has a teams
+`bu1` has `team-a` and `team-b` under `defaults/teams/`. No environment has a teams
 folder of its own, so that path is [built].
 
 `charts/teams-bootstrap` refuses a team file whose namespaces or destinations
@@ -279,7 +290,7 @@ Kept simple on purpose. None of this is planned work yet.
 - **Pull delivery of the agent token**, as described above.
 - **A persistent store.** Replace dev-mode OpenBao with a store that survives
   restarts, and replace the dev token with Kubernetes auth for ESO.
-- **Staged upgrades.** A pinned revision per stage, so one stage moves before
+- **Staged upgrades.** A pinned revision per environment, so one environment moves before
   the next.
 - **Two agents in one cluster: one cluster-wide, one namespaced.** The
   namespaced one would run without ClusterRoles, without installing CRDs and
@@ -304,8 +315,8 @@ Kept simple on purpose. None of this is planned work yet.
 4. The `hub` workspace of `workshop/2-clusters` (cluster and the two Helm releases).
 5. Any upgrade of Argo CD, the agent or the controller on a spoke.
 6. Offboarding a team or a tenant. Spokes have been removed by hand.
-7. A second tenant (`tenants/bu2/` is empty), a second stage running beside
-   `test`, and a teams folder for one stage.
+7. A second tenant (`tenants/bu2/` is empty), a second environment running beside
+   `test`, and a teams folder for one environment.
 8. A team deploying from its own repository. The only Application that has
    run is one example created by hand on an earlier spoke.
 9. The store after a restart: that ESO keeps the cluster Secrets and the
@@ -326,7 +337,7 @@ Kept simple on purpose. None of this is planned work yet.
 5. Who writes a new cluster's connection and key into the store in a real
    setup: the provisioning that creates the cluster?
 6. Which store does the workshop use once dev-mode OpenBao is replaced?
-7. Does the reference need staged upgrades (a pinned revision per stage)
+7. Does the reference need staged upgrades (a pinned revision per environment)
    before it is published?
 8. What may a team's users do in Harness? No Harness roles are designed for
    them.
@@ -344,6 +355,6 @@ These are files that say or do something the build no longer matches.
 - `workshop/2-clusters/cluster-values/*.yaml` names the tenant `bu`; member
   files name it `tenant`.
 - `tenants/bu1/gitops-agents/nonprod/values.yaml` applies to no fleet member:
-  none has stage `nonprod`.
+  none has environment `nonprod`.
 - The diagram of [People and ownership](people-and-ownership.md) shows the
   state of 2026-11-13.

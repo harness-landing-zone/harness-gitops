@@ -16,8 +16,9 @@ clusterName: ""
 # The tenant that owns the cluster (its Harness org; a tenant can be a
 # business unit). From the member file.
 tenant: ""
-# The stage label (nonprod, prod, ...). From the member file. Required when
-# model is agent.
+# The environment label (dev, test, prod, ...). Required when model is agent.
+environment: ""
+# Older member files may still use stage.
 stage: ""
 # From the member file, required, stamped as label model: agent (the agents
 # group in groups/agents.yaml installs an agent) or push (registered only; the

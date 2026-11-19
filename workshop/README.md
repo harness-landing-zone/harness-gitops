@@ -221,7 +221,7 @@ Check Harness GitOps in the `bu1` organization for removal of the `spoke_test` a
 
 ```bash
 unset TF_WORKSPACE
-tofu -chdir=workshop/2-clusters workspace select spoke-test &&
+tofu -chdir=workshop/2-clusters workspace select spoke-dev &&
   tofu -chdir=workshop/2-clusters plan -destroy &&
   tofu -chdir=workshop/2-clusters destroy
 ```

@@ -13,7 +13,7 @@
 labels:
   cluster: '{{ .name }}'
   tenant: '{{ .metadata.labels.tenant }}'
-  stage: '{{ .metadata.labels.stage }}'
+  environment: '{{ .metadata.labels.environment }}'
 
 applicationSets:
 
@@ -26,8 +26,8 @@ applicationSets:
   # side is runtime and teams.
   #
   # Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
-  # <stage>/values.yaml, and the teams under defaults/teams/, then
-  # <stage>/teams/ (a stage file overrides a default team field by field).
+  # <environment>/values.yaml, and the teams under defaults/teams/, then
+  # <environment>/teams/ (a environment file overrides a default team field by field).
   #
   # Identity comes from the cluster Secret: org <tenant>, ORG scope,
   # identifier <spoke> with "_". It is immutable, so never rename a spoke's
@@ -42,7 +42,7 @@ applicationSets:
       # for every spoke.
       matchExpressions:
         - {key: tenant, operator: Exists}
-        - {key: stage, operator: Exists}
+        - {key: environment, operator: Exists}
     name: '{{ .name }}-agent'
     labels:
       role: registration
@@ -61,11 +61,11 @@ applicationSets:
       - path: charts/agent-registration
         helm:
           releaseName: '{{ .name }}'
-          # The stage file is optional.
+          # The environment file is optional.
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
-            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.environment }}/values.yaml'
           # Enforced over the tenant files. Keep equal to the runtime's
           # identity in runtime.
           valuesObject:
@@ -99,11 +99,11 @@ applicationSets:
       - path: charts/teams-bootstrap
         helm:
           releaseName: '{{ .name }}-teams'
-          # A stage without teams renders nothing.
+          # A environment without teams renders nothing.
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/teams/*/values.yaml'
-            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
+            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.environment }}/teams/*/values.yaml'
           # Enforced: every mapping points at this spoke's agent.
           valuesObject:
             target: hub
@@ -121,7 +121,7 @@ applicationSets:
         controller: self
       matchExpressions:
         - {key: tenant, operator: Exists}
-        - {key: stage, operator: Exists}
+        - {key: environment, operator: Exists}
     name: '{{ .name }}-controller'
     labels:
       role: controller
@@ -147,7 +147,7 @@ applicationSets:
   #           token locally, while ESO pushes the hub-managed token.
   #
   # Values: tenants/<tenant>/gitops-agents/defaults/values.yaml, then
-  # <stage>/values.yaml.
+  # <environment>/values.yaml.
   runtime:
     selector:
       matchLabels:
@@ -155,7 +155,7 @@ applicationSets:
         model: agent
       matchExpressions:
         - {key: tenant, operator: Exists}
-        - {key: stage, operator: Exists}
+        - {key: environment, operator: Exists}
     name: '{{ .name }}-runtime'
     labels:
       role: runtime
@@ -176,7 +176,7 @@ applicationSets:
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
-            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.environment }}/values.yaml'
           valuesObject:
             gitopsAgent:
               # Agent-registration renders the agent object. The teams-bootstrap
@@ -240,11 +240,11 @@ applicationSets:
       - path: charts/agent-registration
         helm:
           releaseName: '{{ .name }}'
-          # The stage file is optional.
+          # The environment file is optional.
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/values.yaml'
-            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/values.yaml'
+            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.environment }}/values.yaml'
           # Enforced over the tenant files. Keep equal to the runtime's
           # identity above.
           valuesObject:
@@ -278,7 +278,7 @@ applicationSets:
   # The team side on every spoke: <spoke>-teams on that spoke, in namespace
   # <spoke>, running charts/teams-bootstrap with one entry per team from
   # tenants/<tenant>/gitops-agents/defaults/teams/<team>/values.yaml (every
-  # stage), then <stage>/teams/<team>/values.yaml (overrides or extra teams):
+  # environment), then <environment>/teams/<team>/values.yaml (overrides or extra teams):
   # its namespaces (wave 0), its AppProject (1), its mapping (2). On a new
   # spoke it retries until the agent's CRDs and agent object exist. (Hub
   # model: only namespaces and AppProjects here; the mappings are on the hub.)
@@ -289,7 +289,7 @@ applicationSets:
         model: agent
       matchExpressions:
         - {key: tenant, operator: Exists}
-        - {key: stage, operator: Exists}
+        - {key: environment, operator: Exists}
     name: '{{ .name }}-teams'
     labels:
       role: teams
@@ -305,11 +305,11 @@ applicationSets:
       - path: charts/teams-bootstrap
         helm:
           releaseName: '{{ .name }}-teams'
-          # A stage without teams renders nothing.
+          # A environment without teams renders nothing.
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/defaults/teams/*/values.yaml'
-            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.stage }}/teams/*/values.yaml'
+            - '$values/tenants/{{ .metadata.labels.tenant }}/gitops-agents/{{ .metadata.labels.environment }}/teams/*/values.yaml'
           # Enforced: every mapping points at this spoke's agent.
           valuesObject:
             # Both models render namespaces and AppProjects on the spoke.

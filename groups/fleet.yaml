@@ -14,13 +14,13 @@ applicationSets:
   # Registers every fleet member, as EKS Fleet Management does. A cluster is a
   # member because fleet-members/<cluster>.yaml exists. The file name is the
   # Argo CD cluster name and the cluster Secret name; the file says how the
-  # cluster is bootstrapped (tenant, stage, model, controller,
+  # cluster is bootstrapped (tenant, environment, model, controller,
   # harnessSecretName).
   #
   # For each file this makes Application <cluster>-registration on the hub
   # (charts/cluster-registration). ESO then creates that cluster Secret in
   # hga-hub-agent from the connection in OpenBao clusters/<cluster>. The
-  # labels (tenant, stage, fleet_member, model) come from Git. The agents group
+  # labels (tenant, environment, fleet_member, model) come from Git. The agents group
   # selects on those labels.
   #
   # Removing a member file deletes nothing. Deleting the ExternalSecret deletes
@@ -38,7 +38,7 @@ applicationSets:
       cluster: '{{ trimSuffix ".yaml" .path.filename }}'
       # From the member file; "" when a file leaves them out.
       tenant: '{{ default "" (index . "tenant") }}'
-      stage: '{{ default "" (index . "stage") }}'
+      environment: '{{ default (default "" (index . "stage")) (index . "environment") }}'
     # The hub, from the matrix.
     destination:
       namespace: hga-hub-agent

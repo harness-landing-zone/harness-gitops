@@ -29,9 +29,9 @@ One rule ties the names together and is used everywhere in this guide:
 - team = one Harness project = one Argo CD AppProject on each of its tenant's
   spokes.
 
-Every spoke has a **stage** (for example `test`, `nonprod`, `prod`). The
-stage chooses which values and which teams the spoke gets. Nothing is
-upgraded stage by stage yet: every stage follows `main`.
+Every spoke has a **environment** (for example `test`, `nonprod`, `prod`). The
+environment chooses which values and which teams the spoke gets. Nothing is
+upgraded environment by environment yet: every environment follows `main`.
 
 A spoke's agent is either **self-managed** (the spoke runs its own controller
 and holds its own API key) or **hub-managed** (the key and the agent objects
@@ -44,8 +44,8 @@ stay on the hub). The table says where the two differ.
 | The hub's controller, the account-level API key and each tenant's API key | Hub cluster, namespace `hga-system` | Platform team | proven |
 | Hub agent and its Argo CD | Hub cluster | Platform team | proven |
 | The ApplicationSets and the charts | This repo, `groups/` and `charts/` | Platform team | proven |
-| Member file `fleet-members/<cluster>.yaml`: tenant, stage and model of one spoke | This repo | Platform team | proven |
-| Spoke cluster Secret, labelled `tenant` and `stage` | Hub cluster | Platform team; External Secrets builds it from the store and the member file | proven |
+| Member file `fleet-members/<cluster>.yaml`: tenant, environment and model of one spoke | This repo | Platform team | proven |
+| Spoke cluster Secret, labelled `tenant` and `environment` | Hub cluster | Platform team; External Secrets builds it from the store and the member file | proven |
 | Tenant files under `tenants/<tenant>/gitops-agents/`: agent values, and one file per team with its Harness project, namespaces and source repos | This repo | Platform team reviews every change | proven; who raises the change is open |
 | Agent object, project mappings and, when self-managed, the spoke's controller and API key | Self-managed: the spoke. Hub-managed: the hub, one namespace per spoke | Platform team; the controller writes the agent token | self-managed proven; no current spoke is hub-managed |
 | Argo CD, agent, agent token, AppProjects and team namespaces on a spoke | Spoke cluster | Platform team; nobody edits them by hand | proven |

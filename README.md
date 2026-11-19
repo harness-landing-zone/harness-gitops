@@ -49,13 +49,13 @@ flowchart LR
 
 ```
 groups/             addons, fleet registration, and spoke agent group values
-fleet-members/      one file per spoke: tenant, stage, model, controller,
+fleet-members/      one file per spoke: tenant, environment, model, controller,
                     harnessSecretName
 decommissioned/     member files of removed spokes; nothing reads it
 tenants/<tenant>/gitops-agents/
   defaults/         values for every spoke of the tenant
   defaults/teams/   one file per team, for every spoke of the tenant
-  <stage>/          values, and optionally teams, for one stage
+  <environment>/    values, and optionally teams, for one environment
 charts/             application-sets, the official controller chart, gitops-agent
                     (wraps the official gitops-helm), cluster-registration,
                     agent-registration, teams-bootstrap
@@ -98,7 +98,7 @@ Self-managed:
 
    ```yaml
    tenant: bu1        # the Harness org
-   stage: test        # which values and teams it gets
+   environment: test  # which values and teams it gets
    model: agent       # install an agent (push: registered only)
    addons: hub        # the hub pushes this cluster's add-ons
    controller: self   # self = self-managed, hub = hub-managed
@@ -129,8 +129,9 @@ installs where, and for what is not proven.
    `tenants/bu1/gitops-agents/defaults/teams/team-a/values.yaml` is an example.
 
 Every spoke of that tenant gets the team's namespaces, its AppProject and its
-mapping to the Harness project. A team file under `<stage>/teams/` reaches
-only the spokes of that stage. Namespaces must start with `<team>-`.
+mapping to the Harness project. A team file under `<environment>/teams/`
+reaches only the spokes of that environment. Namespaces must start with
+`<team>-`.
 
 ## Things that bite
 
@@ -159,7 +160,7 @@ only the spokes of that stage. Namespaces must start with `<team>-`.
 
 - Hub-managed on a current fleet member, and moving a spoke to it.
 - A persistent secret store.
-- Staged upgrades across stages.
+- Staged upgrades across environments.
 - Offboarding a team, a spoke or a tenant.
 - Team repositories feeding Applications, and Harness roles for team users.
 - Anything outside local k3d clusters.

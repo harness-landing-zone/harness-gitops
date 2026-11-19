@@ -8,9 +8,9 @@
 # under; its values and teams are in tenants/<tenant>/gitops-agents/. Reviewed
 # like any identity: never change it.
 tenant: bu1
-# The stage folder of tenants/<tenant>/gitops-agents/ (values and teams). There
-# is no test/ folder yet, so the spoke gets the default values and teams.
-stage: dev
+# The environment folder of tenants/<tenant>/gitops-agents/ (values and teams).
+# There is no dev/ folder yet, so this spoke gets the defaults.
+environment: dev
 # agent: install a GitOps agent on this cluster; push: registered only, the
 # hub's Argo CD deploys to it. Stamped as label model.
 model: agent

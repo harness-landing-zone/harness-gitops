@@ -15,6 +15,7 @@ stays in the store and out of git.
 */}}
 {{- if .Values.externalSecret.enabled }}
 {{- $name := .Values.clusterName }}
+{{- $kubeconfig := printf "%s-eso-push-kubeconfig" $name }}
 {{- $agent := eq .Values.model "agent" }}
 {{- $hub := and $agent (eq .Values.controller "hub") }}
 {{- $key := .Values.harnessSecretName }}
@@ -32,7 +33,7 @@ stays in the store and out of git.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: {{ $name }}-kubeconfig
+  name: {{ $kubeconfig }}
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ .Chart.Name }}
@@ -41,6 +42,8 @@ metadata:
   annotations:
     # The ESO CRDs may arrive after this Application.
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # Create the credential before changing the push store's reference.
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   refreshInterval: {{ .Values.refreshInterval }}
   secretStoreRef:
@@ -54,7 +57,7 @@ spec:
         property: {{ . }}
     {{- end }}
   target:
-    name: {{ $name }}-kubeconfig
+    name: {{ $kubeconfig }}
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
@@ -99,7 +102,7 @@ spec:
       remoteNamespace: {{ $name }}
       # authRef replaces server and auth: the kubeconfig carries both.
       authRef:
-        name: {{ $name }}-kubeconfig
+        name: {{ $kubeconfig }}
         namespace: {{ .Release.Namespace }}
         key: kubeconfig
 {{- end }}
@@ -151,7 +154,7 @@ spec:
       # Where the spoke's controller reads its key.
       remoteNamespace: hga-system
       authRef:
-        name: {{ $name }}-kubeconfig
+        name: {{ $kubeconfig }}
         namespace: {{ .Release.Namespace }}
         key: kubeconfig
 ---
