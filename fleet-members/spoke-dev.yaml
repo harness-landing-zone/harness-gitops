@@ -29,8 +29,3 @@ controller: hub
 # <spoke>-<add-on>.
 labels:
   enable_external_secrets: "true"
-# Self-managed only: the OpenBao path of this spoke's controller key
-# (harness-api-keys/<name>, property api_key, written by workshop/2-clusters).
-# The hub pushes it to the spoke as hga-system/harness-api-key-secret; empty =
-# that Secret is created by hand. Must stay empty when hub-managed.
-harnessSecretName: harness-api-keys/spoke-dev
