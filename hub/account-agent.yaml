@@ -38,6 +38,9 @@ argo-cd:
     params:
       server.repo.server.timeout.seconds: "300"
       controller.repo.server.timeout.seconds: "300"
+      # A git files generator's * stops at /, so fleet-registration/*.yaml-style paths do
+      # not also match files in subfolders (legacy globbing does).
+      applicationsetcontroller.enable.new.git.file.globbing: "true"
     cm:
       cluster.inClusterEnabled: "true"
       # Distinct tracking label for the PE Admin Argo CD so it never collides

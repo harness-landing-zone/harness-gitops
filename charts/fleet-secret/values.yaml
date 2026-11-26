@@ -1,5 +1,5 @@
 # Registers one cluster Secret into an Argo CD / Harness GitOps Agent namespace,
-# driven by clusters/<agent>/<cluster>.yaml:
+# driven by fleet-registration/<agent>/clusters/<cluster>.yaml:
 #
 #   mode: local  - Least-privilege target on this same cluster: Delivery SA +
 #                  token, team workload namespaces (PSA + Delete=false),
@@ -17,7 +17,7 @@ tenant: ""
 environment: ""
 
 cluster:
-  # Set by fleet/clusters.yaml from the filename of clusters/<agent>/<cluster>.yaml.
+  # Set by bootstrap/fleet-members.yaml or fleet-registrations.yaml from the file name.
   name: ""
 
 # --- mode: local settings ----------------------------------------------------
@@ -28,30 +28,8 @@ local:
   refreshInterval: 5m
   agentReadLogs: false
 
-# Least-privilege Kubernetes Role rules granted to <cluster>-delivery inside
-# each team's workload namespaces (mode: local).
-deliveryRoleRules:
-  - apiGroups: [""]
-    resources: ["configmaps", "secrets", "services", "serviceaccounts", "persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "events"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["batch"]
-    resources: ["jobs", "cronjobs"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses", "networkpolicies"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["autoscaling"]
-    resources: ["horizontalpodautoscalers"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["policy"]
-    resources: ["poddisruptionbudgets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# The rules delivery identities get in team namespaces live once, in
+# ClusterRole gitops-delivery (charts/hub-bootstrap); this chart only binds it.
 
 # Merged from tenants/<tenant>/teams/*/values.yaml when mode: local.
 teams: {}
@@ -60,7 +38,8 @@ teams: {}
 remote:
   secretStoreKind: ClusterSecretStore
   secretStore: hub-secret-store
-  # Path/key in the secret store. Empty defaults to "clusters/<cluster.name>".
+  # Required: the store entry holding server, caData and token (for example
+  # clusters/spoke-1, written by the spoke's tofu). Never taken from the file name.
   remoteKey: ""
   refreshInterval: 1m
   # Optional namespace/cluster-resource restriction for remote Org Agent targets.

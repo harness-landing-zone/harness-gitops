@@ -1,0 +1,12 @@
+# One rule set for every agent's delivery identity. It grants nothing on its
+# own: charts/fleet-secret binds it with a RoleBinding in each team namespace,
+# so a delivery ServiceAccount gets these rights only there. The name is fixed
+# because charts/fleet-secret refers to it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gitops-delivery
+  labels:
+    {{- include "hub-bootstrap.labels" . | nindent 4 }}
+rules:
+  {{- toYaml .Values.deliveryRules | nindent 2 }}

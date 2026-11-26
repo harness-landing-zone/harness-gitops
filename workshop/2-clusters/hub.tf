@@ -6,13 +6,13 @@
 #      hga-system, hub-cluster Secret, platform-admin AppProject, root groups
 #      ApplicationSet — plain Helm resources, zero hooks)
 locals {
-  setup              = one(data.terraform_remote_state.setup[*].outputs)
-  env                = try(local.setup.environment_id, "")
-  agent_name         = "hga-${local.env}-hub"
-  agent_id           = "hga_${local.env}_hub"
-  token_secret       = "hga-${local.env}-hub-token"
-  hub_dir            = "${path.module}/../../hub"
-  revision           = try(local.values.revision, "main")
+  setup               = one(data.terraform_remote_state.setup[*].outputs)
+  env                 = try(local.setup.environment_id, "")
+  agent_name          = "hga-${local.env}-hub"
+  agent_id            = "hga_${local.env}_hub"
+  token_secret        = "hga-${local.env}-hub-token"
+  hub_dir             = "${path.module}/../../hub"
+  revision            = try(local.values.revision, "main")
   gitops_server_host  = try(local.setup.gitops_server_host, "https://app.harness.io/prod1/gitops")
   agent_http_target   = try(local.setup.agent_http_target, "https://app.harness.io/gitops")
   harness_helm_repo   = "https://harness.github.io/gitops-helm"

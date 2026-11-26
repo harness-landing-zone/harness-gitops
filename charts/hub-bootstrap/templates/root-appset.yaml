@@ -3,7 +3,7 @@
 {{- $repoURL := default (.Values.gitSecret).url $as.repoURL }}
 {{- $revision := default "HEAD" $as.targetRevision }}
 {{- $project := default "platform-admin" $as.project }}
-{{- $fleetPath := default "fleet" $as.fleetPath }}
+{{- $path := default "bootstrap" $as.path }}
 {{- if not $repoURL }}
 {{- fail "rootAppSet.repoURL is required when gitSecret.url is not set" }}
 {{- end }}
@@ -33,6 +33,10 @@ spec:
       kind: "*"
 ---
 {{- end }}
+{{- /* Root ApplicationSet (as in EKS Fleet Management and hub-orchestrator): one
+Application per hub cluster Secret, syncing the plain ApplicationSet manifests
+in rootAppSet.path (non-recursive). Each of those installs charts/application-sets
+with its own values catalogue. */}}
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -47,46 +51,30 @@ spec:
     preserveResourcesOnDeletion: true
     applicationsSync: create-update
   generators:
-    - git:
-        repoURL: {{ $repoURL | quote }}
-        revision: {{ $revision | quote }}
-        files:
-          {{- range (default (list "*") $as.sets) }}
-          - path: {{ printf "%s/%s.yaml" $fleetPath . | quote }}
-          {{- end }}
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: hub-cluster
   template:
     metadata:
-      name: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
-      labels:
-        fleet: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+      name: {{ default "fleet-root" $as.name | quote }}
     spec:
       project: {{ $project | quote }}
-      sources:
-        - repoURL: {{ $repoURL | quote }}
-          targetRevision: {{ $revision | quote }}
-          ref: values
-        - repoURL: {{ $repoURL | quote }}
-          targetRevision: {{ $revision | quote }}
-          path: charts/application-sets
-          helm:
-            releaseName: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
-            valueFiles:
-              - '$values/{{`{{ .path.path }}/{{ .path.filename }}`}}'
-            parameters:
-              - name: group
-                value: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
-                forceString: true
-              - name: revision
-                value: {{ $revision | quote }}
-                forceString: true
-              - name: project
-                value: {{ $project | quote }}
-                forceString: true
+      source:
+        repoURL: {{ $repoURL | quote }}
+        targetRevision: {{ $revision | quote }}
+        path: {{ $path | quote }}
+        directory:
+          recurse: false
       destination:
         namespace: {{ .Release.Namespace | quote }}
-        name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
+        name: '{{`{{ .name }}`}}'
       syncPolicy:
         automated:
           selfHeal: true
           prune: false
+        retry:
+          limit: 100
+          backoff:
+            duration: 1m
 {{- end }}

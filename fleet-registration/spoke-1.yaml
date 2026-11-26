@@ -1,0 +1,7 @@
+# Spoke spoke-1, registered with this hub's PE admin agent.
+remote:
+  # The store entry with spoke-1's server, CA and admin token, written by the
+  # spoke's tofu (workshop/2-clusters, workspace spoke-1).
+  remoteKey: clusters/spoke-1
+  labels:
+    enable_external_secrets: "true"

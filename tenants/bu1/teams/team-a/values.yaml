@@ -12,5 +12,6 @@ teams:
     namespaces:
       - team-a-apps
     destinations:
-      - server: https://kubernetes.default.svc.cluster.local
+      # Any cluster registered into this agent (fleet-registration/<agent>/clusters/).
+      - name: "*"
         namespace: team-a-*

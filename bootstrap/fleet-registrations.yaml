@@ -1,0 +1,82 @@
+# Agent registrations: fleet-registration/<agent>/clusters/<cluster>.yaml
+# registers <cluster> into <agent> (folder = agent namespace, file name = the
+# Argo CD cluster Secret name there). mode in the file: local (default, target
+# is this hub) or remote. Deleting a file deregisters the cluster from that
+# agent (applicationsSync sync, no preserve).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleet-registrations
+  namespace: hga-hub-agent
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: false
+    applicationsSync: sync
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  fleet_member: hub-cluster
+          - git:
+              repoURL: '{{ .metadata.annotations.repo_url }}'
+              revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+              files:
+                - path: 'fleet-registration/*/clusters/*.yaml'
+  template:
+    metadata:
+      name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+      labels:
+        agent: '{{ index .path.segments 1 }}'
+        cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+        cluster_mode: '{{ default "local" (index . "mode") }}'
+        tenant: '{{ default "" (index . "tenant") }}'
+    spec:
+      project: platform-admin
+      destination:
+        name: '{{ .name }}'
+        namespace: '{{ index .path.segments 1 }}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        retry:
+          limit: 100
+          backoff:
+            duration: 1m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          path: charts/fleet-secret
+          helm:
+            releaseName: '{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+            # A remote registration may have no tenant, so the team glob may
+            # match nothing; that is the only reason missing files are allowed.
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/tenants/{{ default "none" (index . "tenant") }}/teams/*/values.yaml
+              - $values/{{ .path.path }}/{{ .path.filename }}
+            # Only what comes from the file name or the hub cluster Secret;
+            # mode, tenant and environment come from the file itself.
+            parameters:
+              - name: cluster.name
+                value: '{{ trimSuffix ".yaml" .path.filename }}'
+                forceString: true
+              - name: remote.annotations.repo_url
+                value: '{{ .metadata.annotations.repo_url }}'
+                forceString: true
+              - name: remote.annotations.repo_revision
+                value: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+                forceString: true
+              - name: remote.annotations.harness_account_id
+                value: '{{ .metadata.annotations.harness_account_id }}'
+                forceString: true

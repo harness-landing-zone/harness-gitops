@@ -12,13 +12,21 @@ hubCluster:
   enabled: true
   name: hub-cluster
   labels:
-    # Single-cluster Reference Architecture needs ESO only (no OpenBao): ESO's
-    # local Kubernetes SecretStore reads each fleet member's delivery SA token.
+    # ESO: builds every cluster Secret (local delivery tokens and spoke
+    # connections from the store).
     enable_external_secrets: "true"
+    # OpenBao (dev mode) + ClusterSecretStore hub-secret-store: where each
+    # spoke's tofu writes its connection (clusters/<spoke>).
+    enable_openbao: "true"
 
 rootAppSet:
   enabled: true
   name: fleet-root
-  fleetPath: fleet
+  path: bootstrap
   project: platform-admin
   createProject: true
+  # Chart repositories the platform-admin project may install from.
+  allowedChartRepos:
+    - https://harness.github.io/gitops-helm
+    - https://charts.external-secrets.io
+    - https://openbao.github.io/openbao-helm

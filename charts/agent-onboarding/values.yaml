@@ -1,13 +1,13 @@
 # PE-managed onboarding for one lower-privilege Org GitOps Agent, driven by
-# agents/<name>.yaml and merged with tenants/<tenant>/teams/*/values.yaml.
+# fleet-registration/<name>/agent.yaml and merged with tenants/<tenant>/teams/*/values.yaml.
 
 # Harness organization identifier (lowercase letters and digits only), read
-# straight from agents/<name>.yaml.
+# straight from fleet-registration/<name>/agent.yaml.
 tenant: ""
 
-# Set by fleet/agents.yaml from the filename and the hub cluster Secret.
+# Set by bootstrap/fleet-agents.yaml from the folder and the hub cluster Secret.
 agent:
-  # DNS-1123 agent name (matches filename of agents/<name>.yaml and namespace).
+  # DNS-1123 agent name (the folder of fleet-registration/<name>/agent.yaml and its namespace).
   name: ""
   # Harness agent identifier (underscores, e.g. bu1_dev).
   identifier: ""

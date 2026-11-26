@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Local k3d hub cluster on Docker bridge network hga.
+# Local k3d hub and spoke clusters on Docker bridge network hga.
 #   k3d.sh preflight        check required CLIs, Docker memory, and hga network
 #   k3d.sh hub              create hga-hub if missing, pin IPs, wait for /readyz
+#   k3d.sh spoke <name>     create hga-<name> (name spoke-*), pin IPs, and store
+#                           its admin connection in OpenBao on the hub at
+#                           clusters/<name> (server, caData, token)
+#   k3d.sh register         store every hga-spoke-* connection again (after a
+#                           hub restart: dev-mode OpenBao starts empty)
 #   k3d.sh pin [cluster...] fix container IPs on network hga
 #   k3d.sh down [name...]   delete hga-<name> (default: all hga-* clusters)
 set -euo pipefail
+
+hub=k3d-hga-hub
 
 wait_ready() {
   local ctx="k3d-$1"
@@ -69,6 +76,66 @@ create_cluster() {
     --kubeconfig-switch-context=false >/dev/null
 }
 
+# Writes the JSON on stdin into OpenBao on the hub at path $1. Stdin only: the
+# values never reach a command line or the disk, and never leave the pod.
+bao_put() {
+  kubectl --context "$hub" -n openbao wait --for=condition=Ready pod/openbao-0 \
+    --timeout=120s </dev/null >/dev/null
+  kubectl --context "$hub" -n openbao exec -i openbao-0 -- \
+    sh -c 'BAO_TOKEN="$VAULT_DEV_ROOT_TOKEN_ID" bao kv put -mount=secret "$1" - >/dev/null' \
+    _ "$1"
+}
+
+# What `argocd cluster add` does on the spoke side, for spoke $1: a
+# cluster-admin ServiceAccount argocd-manager and a long-lived token. The
+# connection goes into OpenBao at clusters/<spoke>; the hub's admin
+# registration (clusters/hga-hub-agent/<spoke>.yaml) turns it into a cluster
+# Secret. Only the PE agent may read it (ClusterSecretStore hub-secret-store).
+register_spoke() {
+  local name=$1 spoke=k3d-hga-$1
+  # The spoke's API as the hub's pods reach it on the shared Docker network.
+  local server=https://k3d-hga-$name-server-0:6443
+  kubectl --context "$spoke" apply -f - >/dev/null <<YAML
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: argocd-manager, namespace: kube-system}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: argocd-manager}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: cluster-admin}
+subjects:
+  - {kind: ServiceAccount, name: argocd-manager, namespace: kube-system}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-manager-token
+  namespace: kube-system
+  annotations: {kubernetes.io/service-account.name: argocd-manager}
+type: kubernetes.io/service-account-token
+YAML
+  # The token controller fills the Secret asynchronously.
+  for _ in $(seq 1 30); do
+    [ -n "$(kubectl --context "$spoke" -n kube-system get secret argocd-manager-token \
+      -o jsonpath='{.data.token}' | head -c1)" ] && break
+    sleep 1
+  done
+  kubectl --context "$spoke" -n kube-system get secret argocd-manager-token -o json |
+    jq -c --arg server "$server" \
+      '{server: $server, caData: .data["ca.crt"], token: (.data.token | @base64d)}' |
+    bao_put "clusters/$name"
+  echo "stored clusters/$name in OpenBao ($server)"
+}
+
+# A spoke name: a DNS label starting with spoke- (it names the k3d cluster,
+# the OpenBao path and the registration file).
+spoke_name() {
+  local re='^spoke-[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+  [[ ${1:-} =~ $re ]] && [ ${#1} -le 63 ] ||
+    { echo "$0: '${1:-}' is not spoke-<name> (a DNS label)" >&2; exit 2; }
+}
+
 case "${1:-}" in
   preflight)
     for bin in git tofu docker k3d kubectl helm jq; do
@@ -83,6 +150,17 @@ case "${1:-}" in
     create_cluster hga-hub
     pin hga-hub
     ;;
+  spoke)
+    spoke_name "${2:-}"
+    create_cluster "hga-$2"
+    pin "hga-$2"
+    register_spoke "$2"
+    ;;
+  register)
+    for c in $(k3d_clusters hga-spoke-); do
+      register_spoke "${c#hga-}"
+    done
+    ;;
   pin)
     shift
     [ $# -gt 0 ] || set -- $(k3d_clusters hga-)
@@ -95,7 +173,7 @@ case "${1:-}" in
     KUBECONFIG="$HOME/.kube/config" k3d cluster delete "$@"
     ;;
   *)
-    echo "usage: $0 preflight|hub|pin [cluster...]|down [name...]" >&2
+    echo "usage: $0 preflight|hub|spoke <name>|register|pin [cluster...]|down [name...]" >&2
     exit 2
     ;;
 esac

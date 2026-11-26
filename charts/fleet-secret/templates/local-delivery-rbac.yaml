@@ -49,23 +49,15 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
     helm.sh/resource-policy: keep
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ printf "%s-delivery" $cluster | quote }}
-  namespace: {{ . | quote }}
-  labels:
-    {{- include "fleet-secret.labels" $ | nindent 4 }}
-    app.kubernetes.io/part-of: {{ $team | quote }}
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-rules:
-  {{- toYaml $.Values.deliveryRoleRules | nindent 2 }}
----
+# Lets this agent's delivery identity deploy into this namespace, using the
+# one shared rule set (ClusterRole gitops-delivery, from charts/hub-bootstrap).
+# Bound per namespace, so it grants nothing anywhere else. Named
+# <agent>-<cluster>-delivery: two agents registering the same cluster each get
+# their own binding.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ printf "%s-delivery" $cluster | quote }}
+  name: {{ printf "%s-%s-delivery" $.Release.Namespace $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
     {{- include "fleet-secret.labels" $ | nindent 4 }}
@@ -74,8 +66,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ printf "%s-delivery" $cluster | quote }}
+  kind: ClusterRole
+  name: gitops-delivery
 subjects:
   - kind: ServiceAccount
     name: {{ $deliverySA | quote }}
@@ -85,7 +77,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
+  name: {{ printf "%s-%s-agent-read-logs" $.Release.Namespace $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
     {{- include "fleet-secret.labels" $ | nindent 4 }}
@@ -99,7 +91,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
+  name: {{ printf "%s-%s-agent-read-logs" $.Release.Namespace $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
     {{- include "fleet-secret.labels" $ | nindent 4 }}
@@ -108,7 +100,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
+  name: {{ printf "%s-%s-agent-read-logs" $.Release.Namespace $cluster | quote }}
 subjects:
   - kind: ServiceAccount
     name: gitops-agent

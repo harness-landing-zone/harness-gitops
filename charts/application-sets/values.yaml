@@ -1,5 +1,5 @@
 # Renders one ApplicationSet per entry under applicationSets. Installed once per
-# fleet group by the hub's root ApplicationSet (charts/hub-bootstrap) from fleet/*.yaml.
+# group by a plain ApplicationSet in bootstrap/ (today only addons.yaml).
 
 group: ""
 revision: HEAD
@@ -12,12 +12,17 @@ syncPolicyAppSet:
   preserveResourcesOnDeletion: true
   applicationsSync: create-update
 
-# Omit retry.limit by default: Harness's GitOps protobuf-JSON API serializes
-# int64 fields like retry.limit as quoted strings ("20"), which causes Harness
-# UI Validate/Save to fail with "cannot unmarshal string into int64".
+# retry: a fresh hub converges while CRDs and the store arrive (Argo does not
+# re-run a failed auto-sync of the same commit without it). Known: Harness's
+# protobuf-JSON API may serialize retry.limit as a string, which can break
+# Validate/Save of these Applications in the Harness UI; Argo is unaffected.
 syncPolicy:
   automated:
     selfHeal: true
     prune: false
+  retry:
+    limit: 100
+    backoff:
+      duration: 1m
 
 applicationSets: {}

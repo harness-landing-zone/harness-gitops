@@ -1,0 +1,77 @@
+# Fleet members: fleet-registration/<cluster>.yaml registers <cluster>
+# with this hub's PE admin agent (hga-hub-agent), using the admin connection the
+# cluster's tofu wrote to the store (remote.remoteKey). Agent subfolders are not
+# read here (new git globbing). Offboarding a member is deliberate: removing its
+# file leaves the registration in place (create-update, preserve).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleet-members
+  namespace: hga-hub-agent
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    applicationsSync: create-update
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  fleet_member: hub-cluster
+          - git:
+              repoURL: '{{ .metadata.annotations.repo_url }}'
+              revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+              files:
+                - path: 'fleet-registration/*.yaml'
+  template:
+    metadata:
+      name: 'member-{{ trimSuffix ".yaml" .path.filename }}'
+      labels:
+        agent: hga-hub-agent
+        cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+    spec:
+      project: platform-admin
+      destination:
+        name: '{{ .name }}'
+        namespace: hga-hub-agent
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        retry:
+          limit: 100
+          backoff:
+            duration: 1m
+        syncOptions:
+          - ServerSideApply=true
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          path: charts/fleet-secret
+          helm:
+            releaseName: 'hga-hub-agent-{{ trimSuffix ".yaml" .path.filename }}'
+            valueFiles:
+              - $values/{{ .path.path }}/{{ .path.filename }}
+            # The folder makes it an admin registration, so mode is set here.
+            parameters:
+              - name: mode
+                value: remote
+                forceString: true
+              - name: cluster.name
+                value: '{{ trimSuffix ".yaml" .path.filename }}'
+                forceString: true
+              - name: remote.annotations.repo_url
+                value: '{{ .metadata.annotations.repo_url }}'
+                forceString: true
+              - name: remote.annotations.repo_revision
+                value: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+                forceString: true
+              - name: remote.annotations.harness_account_id
+                value: '{{ .metadata.annotations.harness_account_id }}'
+                forceString: true

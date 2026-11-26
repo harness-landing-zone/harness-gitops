@@ -1,0 +1,31 @@
+# The one store for cluster connections. Only hga-hub-agent (the PE agent)
+# may use it, so no developer agent can read an admin token through it.
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: hub-secret-store
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  conditions:
+    - namespaces: [hga-hub-agent]
+  provider:
+    vault:
+      server: http://openbao.openbao.svc:8200
+      path: secret
+      version: v2
+      auth:
+        tokenSecretRef:
+          name: openbao-dev-root-token
+          namespace: openbao
+          key: token
+---
+# Dev mode's published root token (k3d proof only).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openbao-dev-root-token
+  namespace: openbao
+type: Opaque
+stringData:
+  token: root

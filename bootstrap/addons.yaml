@@ -1,0 +1,53 @@
+# Add-ons: installs charts/application-sets with the add-on catalogue
+# addons/bootstrap/addons.yaml (ESO, OpenBao and the store). Each add-on set
+# then selects cluster Secrets by its enable_* label.
+# Synced by the root ApplicationSet (fleet-root), one Application per hub.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: addons
+  namespace: hga-hub-agent
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    applicationsSync: create-update
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleet_member: hub-cluster
+  template:
+    metadata:
+      name: 'addons-{{ .name }}'
+    spec:
+      project: platform-admin
+      sources:
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          ref: values
+        - repoURL: '{{ .metadata.annotations.repo_url }}'
+          targetRevision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+          path: charts/application-sets
+          helm:
+            releaseName: addons
+            valueFiles:
+              - '$values/addons/bootstrap/addons.yaml'
+            parameters:
+              - name: group
+                value: addons
+              - name: revision
+                value: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+                forceString: true
+      destination:
+        name: '{{ .name }}'
+        namespace: hga-hub-agent
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: false
+        retry:
+          limit: 100
+          backoff:
+            duration: 1m

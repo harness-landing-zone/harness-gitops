@@ -1,0 +1,51 @@
+# Add-on catalogue: installed by bootstrap/addons.yaml through
+# charts/application-sets (group addons). Each set selects cluster Secrets by
+# label; per-add-on values come from addonValueFiles.
+labels:
+  cluster: '{{ .name }}'
+
+addonValueFiles:
+  - addons/defaults
+  - 'addons/clusters/{{ .name }}'
+
+applicationSets:
+  # External Secrets Operator (upstream chart, pinned). Used on the cluster by
+  # each fleet member's namespace-scoped SecretStore to turn its Delivery SA
+  # token into a restricted Argo CD cluster Secret without tokens in git.
+  external-secrets:
+    selector:
+      matchLabels:
+        enable_external_secrets: "true"
+    name: '{{ .name }}-external-secrets'
+    destination:
+      namespace: external-secrets
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    chartRepository: https://charts.external-secrets.io
+    chartName: external-secrets
+    defaultVersion: 2.15.0
+
+  # OpenBao on the hub, dev mode (k3d proof only: in memory, lost on restart),
+  # plus the one ClusterSecretStore through which ESO reads it. Spoke tofu
+  # writes each spoke's connection to clusters/<spoke> (server, caData, token).
+  openbao:
+    selector:
+      matchLabels:
+        enable_openbao: "true"
+    name: '{{ .name }}-openbao'
+    destination:
+      namespace: openbao
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    chartRepository: https://openbao.github.io/openbao-helm
+    chartName: openbao
+    defaultVersion: 0.30.7
+    additionalSources:
+      # Plain manifests: ClusterSecretStore hub-secret-store + its dev token.
+      - path: addons/openbao-store
