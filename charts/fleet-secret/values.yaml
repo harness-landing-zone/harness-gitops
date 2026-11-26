@@ -29,7 +29,7 @@ local:
   agentReadLogs: false
 
 # The rules delivery identities get in team namespaces live once, in
-# ClusterRole gitops-delivery (charts/hub-bootstrap); this chart only binds it.
+# ClusterRole workload-edit (add-on addons/workload-edit); this chart only binds it.
 
 # Merged from tenants/<tenant>/teams/*/values.yaml when mode: local.
 teams: {}

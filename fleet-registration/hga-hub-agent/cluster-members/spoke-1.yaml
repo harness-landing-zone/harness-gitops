@@ -5,3 +5,5 @@ remote:
   remoteKey: clusters/spoke-1
   labels:
     enable_external_secrets: "true"
+    # ClusterRole workload-edit, bound by workload agents' memberships.
+    enable_workload_edit: "true"

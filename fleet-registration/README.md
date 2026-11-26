@@ -42,6 +42,7 @@ remote:
   remoteKey: clusters/spoke-1
   labels:
     enable_external_secrets: "true"   # hub add-ons to install on this cluster
+    enable_workload_edit: "true"      # ClusterRole workload-edit, for workload agents
 ```
 
 Removing the file leaves the registration in place: offboarding a cluster is
@@ -81,6 +82,8 @@ mode: local
 tenant: bu1
 ```
 
+The hub then needs ClusterRole `workload-edit` too: add
+`enable_workload_edit: "true"` to `hubCluster.labels` in `hub/bootstrap.yaml`.
 `mode: local` creates a deployer ServiceAccount and token in the agent's
 namespace, the team namespaces, and RoleBindings there; ESO copies the token
 into the restricted cluster Secret (server

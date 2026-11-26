@@ -50,7 +50,7 @@ metadata:
     helm.sh/resource-policy: keep
 ---
 # Lets this agent's delivery identity deploy into this namespace, using the
-# one shared rule set (ClusterRole gitops-delivery, from charts/hub-bootstrap).
+# one shared rule set (ClusterRole workload-edit, the add-on addons/workload-edit).
 # Bound per namespace, so it grants nothing anywhere else. Named
 # <agent>-<cluster>-delivery: two agents registering the same cluster each get
 # their own binding.
@@ -67,7 +67,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: gitops-delivery
+  name: workload-edit
 subjects:
   - kind: ServiceAccount
     name: {{ $deliverySA | quote }}

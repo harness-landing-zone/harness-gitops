@@ -31,31 +31,6 @@ hubCluster:
   labels: {}
   annotations: {}
 
-# Rules of ClusterRole gitops-delivery: what an agent's delivery identity may
-# do inside a team namespace it is bound in (charts/fleet-secret).
-deliveryRules:
-  - apiGroups: [""]
-    resources: ["configmaps", "secrets", "services", "serviceaccounts", "persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "events"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["batch"]
-    resources: ["jobs", "cronjobs"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses", "networkpolicies"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["autoscaling"]
-    resources: ["horizontalpodautoscalers"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["policy"]
-    resources: ["poddisruptionbudgets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
 # Root ApplicationSet: one Application per hub cluster Secret that syncs the
 # plain ApplicationSet manifests in `path` into this Argo CD namespace.
 rootAppSet:

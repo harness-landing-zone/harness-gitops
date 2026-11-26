@@ -49,3 +49,16 @@ applicationSets:
     additionalSources:
       # Plain manifests: ClusterSecretStore hub-secret-store + its dev token.
       - path: addons/openbao-store
+
+  # ClusterRole workload-edit (plain manifest): what workload agents' deployer
+  # identities may do in the namespaces their cluster membership grants. Needed
+  # on every cluster a workload agent deploys to.
+  workload-edit:
+    selector:
+      matchLabels:
+        enable_workload_edit: "true"
+    name: '{{ .name }}-workload-edit'
+    destination:
+      namespace: default
+    sources:
+      - path: addons/workload-edit
