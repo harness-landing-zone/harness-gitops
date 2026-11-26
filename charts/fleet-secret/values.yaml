@@ -47,6 +47,12 @@ remote:
   clusterResources: ""
   # Optional extra labels (e.g. enable_external_secrets: "true").
   labels: {}
+  # Admin members only (bootstrap/fleet-members.yaml turns it on): SecretStore
+  # <cluster> in this namespace, reading Secrets in `namespace` on that cluster
+  # with the admin connection. Workload grants read deployer tokens through it.
+  reader:
+    enabled: false
+    namespace: hga-agents
   # Annotations copied from the hub cluster Secret (repo_url, repo_revision,
   # harness_account_id).
   annotations: {}

@@ -63,6 +63,10 @@ spec:
               - name: mode
                 value: remote
                 forceString: true
+              # SecretStore <cluster>: how workload grants read their deployer
+              # tokens back from this cluster.
+              - name: remote.reader.enabled
+                value: "true"
               - name: cluster.name
                 value: '{{ trimSuffix ".yaml" .path.filename }}'
                 forceString: true

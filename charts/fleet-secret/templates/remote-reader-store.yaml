@@ -1,0 +1,72 @@
+{{- if and (eq (default "local" .Values.mode) "remote") .Values.remote.reader.enabled }}
+{{- $name := .Values.cluster.name }}
+{{- $rc := .Values.remote }}
+{{- $remoteKey := required "remote.remoteKey is required" $rc.remoteKey }}
+{{- $kubeconfig := printf "%s-kubeconfig" $name }}
+# Admin members only: a reader for this cluster, kept in the admin agent's
+# namespace. Workload grants read their deployer tokens from the cluster's
+# agent-identity namespace (reader.namespace) through SecretStore <cluster>;
+# the admin connection itself never leaves this namespace.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $kubeconfig | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fleet-secret.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  refreshInterval: {{ default "1m" $rc.refreshInterval }}
+  secretStoreRef:
+    kind: {{ default "ClusterSecretStore" $rc.secretStoreKind | quote }}
+    name: {{ required "remote.secretStore is required" $rc.secretStore | quote }}
+  data:
+    {{- range list "server" "caData" "token" }}
+    - secretKey: {{ . }}
+      remoteRef:
+        key: {{ $remoteKey | quote }}
+        property: {{ . }}
+    {{- end }}
+  target:
+    name: {{ $kubeconfig | quote }}
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      engineVersion: v2
+      data:
+        config: |
+          apiVersion: v1
+          kind: Config
+          clusters:
+            - name: {{ $name }}
+              cluster:
+                server: "{{`{{ .server }}`}}"
+                certificate-authority-data: "{{`{{ .caData }}`}}"
+          users:
+            - name: admin
+              user:
+                token: "{{`{{ .token }}`}}"
+          contexts:
+            - name: {{ $name }}
+              context: {cluster: {{ $name }}, user: admin}
+          current-context: {{ $name }}
+---
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fleet-secret.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  provider:
+    kubernetes:
+      # Only the agent-identity namespace on the cluster: deployer tokens.
+      remoteNamespace: {{ $rc.reader.namespace | quote }}
+      authRef:
+        name: {{ $kubeconfig | quote }}
+        key: config
+{{- end }}
