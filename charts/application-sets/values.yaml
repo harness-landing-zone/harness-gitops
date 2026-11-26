@@ -1,5 +1,5 @@
 # Renders one ApplicationSet per entry under applicationSets. Installed once per
-# group by the hub's root ApplicationSet (charts/hub-bootstrap) from groups/*.yaml.
+# fleet group by the hub's root ApplicationSet (charts/hub-bootstrap) from fleet/*.yaml.
 
 group: ""
 revision: HEAD

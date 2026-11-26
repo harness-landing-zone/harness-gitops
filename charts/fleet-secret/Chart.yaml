@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fleet-secret
+description: Registers a target cluster Secret into any Harness GitOps / Argo CD Agent namespace — either mode=local (least-privilege Delivery SA, team namespaces, workload RBAC, and local ESO Secret) or mode=remote (ESO ExternalSecret from a ClusterSecretStore).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

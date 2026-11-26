@@ -1,0 +1,39 @@
+# Platform-enforced security & lifecycle guardrails for Org GitOps Agents.
+# Applied LAST in the valueFiles ladder (after tenants/<tenant>/values.yaml) so
+# tenant overrides cannot enable ClusterRoles, CRDs, in-cluster access, or
+# unapproved extraObjects/sidecars.
+
+harnessAgent:
+  enabled: false
+
+projectMappings: []
+
+appProject:
+  enabled: false
+
+upgrader:
+  enabled: false
+
+harness:
+  createClusterRoles: false
+  identity:
+    projectIdentifier: ""
+
+agent:
+  # Starts in wave 2 right after wave 1 HarnessGitopsAgent has written the
+  # token Secret, and before wave 3 HarnessGitopsProjectMappings verify.
+  deploymentAnnotations:
+    argocd.argoproj.io/sync-wave: "2"
+
+argo-cd:
+  crds:
+    install: false
+  extraObjects: []
+  configs:
+    clusterCredentials: null
+    cm:
+      cluster.inClusterEnabled: "false"
+      resource.respectRBAC: "normal"
+      application.instanceLabelKey: argocd.argoproj.io/instance
+  repoServer:
+    extraContainers: []

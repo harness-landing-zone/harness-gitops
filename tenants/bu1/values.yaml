@@ -1,5 +1,5 @@
-# Optional Helm overrides for org-bu1's upstream gitops-helm release.
-# PE enforces createClusterRoles: false, argo-cd.crds.install: false,
-# cluster.inClusterEnabled: "false", identity, and security defaults in
-# groups/orgs.yaml.
+# Optional Helm overrides for bu1's upstream gitops-helm release (e.g. resource
+# sizing or logLevel). Layered between values/agents/gitops-helm/values.yaml
+# (defaults) and values/agents/gitops-helm/enforced.yaml (PE security guardrails:
+# createClusterRoles: false, argo-cd.crds.install: false, cluster.inClusterEnabled: "false").
 {}

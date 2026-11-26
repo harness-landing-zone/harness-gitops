@@ -1,0 +1,6 @@
+apiVersion: v2
+name: agent-onboarding
+description: PE-managed onboarding for a lower-privilege Org GitOps Agent (HarnessGitopsAgent, HarnessGitopsProjectMappings, locked default + allowlisted team AppProjects, and own-namespace agent workload read Role).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

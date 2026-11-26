@@ -1,0 +1,132 @@
+# Cluster registrations: driven by one file per cluster in
+# clusters/<agent>/<cluster>.yaml.
+#
+#   - Parent folder (<agent>) is the target Agent's namespace (e.g. bu1-dev or
+#     hga-hub-agent). The same cluster can be registered into multiple agents.
+#   - Filename (<cluster>) is the Argo CD Cluster Secret name in that namespace.
+#   - Lifecycle is independent of agents/: preserveResourcesOnDeletion is false
+#     and applicationsSync is sync so deleting a cluster file removes its
+#     ExternalSecret and Argo CD Cluster Secret (while local team workload
+#     Namespaces stay protected with Delete=false).
+applicationSets:
+  # Local restricted cluster targets (mode: local) — Delivery SA + team
+  # namespaces + least-privilege RoleBindings + local ESO SecretStore/Secret.
+  local:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: clusters/*/*.yaml
+    postSelector:
+      matchLabels:
+        mode: local
+    name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+    labels:
+      agent: '{{ index .path.segments 1 }}'
+      cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+      cluster_mode: local
+      tenant: '{{ .tenant }}'
+      environment: '{{ default "" (index . "environment") }}'
+    destination:
+      name: hub-cluster
+      namespace: '{{ index .path.segments 1 }}'
+    syncPolicyAppSet:
+      preserveResourcesOnDeletion: false
+      applicationsSync: sync
+    syncPolicy:
+      automated:
+        selfHeal: true
+        prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    sources:
+      - ref: values
+      - path: charts/fleet-secret
+        helm:
+          releaseName: '{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/values/clusters/fleet-secret/values.yaml'
+            - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
+            - '$values/{{ .path.path }}/{{ .path.filename }}'
+          parameters:
+            - name: mode
+              value: local
+              forceString: true
+            - name: cluster.name
+              value: '{{ trimSuffix ".yaml" .path.filename }}'
+              forceString: true
+            - name: cluster.agent
+              value: '{{ index .path.segments 1 }}'
+              forceString: true
+            - name: cluster.tenant
+              value: '{{ .tenant }}'
+              forceString: true
+            - name: cluster.environment
+              value: '{{ default "" (index . "environment") }}'
+              forceString: true
+
+  # Remote cluster targets (mode: remote) — registers an external cluster into
+  # any agent (including hga-hub-agent or an org agent) via ESO.
+  remote:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: clusters/*/*.yaml
+    postSelector:
+      matchLabels:
+        mode: remote
+    name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+    labels:
+      agent: '{{ index .path.segments 1 }}'
+      cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+      cluster_mode: remote
+      tenant: '{{ default "" (index . "tenant") }}'
+      environment: '{{ default "" (index . "environment") }}'
+    destination:
+      name: hub-cluster
+      namespace: '{{ index .path.segments 1 }}'
+    syncPolicyAppSet:
+      preserveResourcesOnDeletion: false
+      applicationsSync: sync
+    syncPolicy:
+      automated:
+        selfHeal: true
+        prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    sources:
+      - ref: values
+      - path: charts/fleet-secret
+        helm:
+          releaseName: '{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/values/clusters/fleet-secret/values.yaml'
+            - '$values/{{ .path.path }}/{{ .path.filename }}'
+          parameters:
+            - name: mode
+              value: remote
+              forceString: true
+            - name: cluster.name
+              value: '{{ trimSuffix ".yaml" .path.filename }}'
+              forceString: true
+            - name: cluster.agent
+              value: '{{ index .path.segments 1 }}'
+              forceString: true
+            - name: cluster.tenant
+              value: '{{ default "" (index . "tenant") }}'
+              forceString: true
+            - name: cluster.environment
+              value: '{{ default "" (index . "environment") }}'
+              forceString: true
+            - name: remote.annotations.repo_url
+              value: '{{ .metadata.annotations.repo_url }}'
+              forceString: true
+            - name: remote.annotations.repo_revision
+              value: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+              forceString: true
+            - name: remote.annotations.harness_account_id
+              value: '{{ .metadata.annotations.harness_account_id }}'
+              forceString: true

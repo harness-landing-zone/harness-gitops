@@ -1,0 +1,98 @@
+# Org GitOps Agents: driven by one file per agent in agents/<name>.yaml.
+# Each agent runs in a namespace named after the agent (e.g. agents/bu1-dev.yaml
+# -> namespace bu1-dev) using official upstream harness/gitops-helm 1.3.0 with
+# ZERO ClusterRoles and ZERO CRDs + charts/agent-onboarding.
+#
+# Chart values live in values/agents/gitops-helm/ (layered around tenant values);
+# this file focuses purely on ApplicationSet wiring and dynamic per-agent params.
+#
+# preserveResourcesOnDeletion stays true and applicationsSync stays create-update
+# so deleting an agent file never accidentally deregisters it in Harness.
+applicationSets:
+  org:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: agents/*.yaml
+    name: '{{ trimSuffix ".yaml" .path.filename }}'
+    labels:
+      cluster: '{{ .name }}'
+      agent: '{{ trimSuffix ".yaml" .path.filename }}'
+      tenant: '{{ .tenant }}'
+      environment: '{{ default "" (index . "environment") }}'
+    destination:
+      name: hub-cluster
+      namespace: '{{ trimSuffix ".yaml" .path.filename }}'
+    syncPolicyAppSet:
+      preserveResourcesOnDeletion: true
+      applicationsSync: create-update
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    sources:
+      - ref: values
+      # Official upstream Harness GitOps Agent chart — zero vendored tarballs,
+      # zero ClusterRoles, zero CRDs.
+      - repoURL: https://harness.github.io/gitops-helm
+        chart: gitops-helm
+        targetRevision: 1.3.0
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/values/agents/gitops-helm/values.yaml'
+            - '$values/tenants/{{ .tenant }}/values.yaml'
+            - '$values/values/agents/gitops-helm/enforced.yaml'
+          parameters:
+            - name: harness.gitopsServerHost
+              value: '{{ default "https://app.harness.io/prod1/gitops" (index .metadata.annotations "gitops_server_host") }}'
+              forceString: true
+            - name: harness.configMap.http.agentHttpTarget
+              value: '{{ default "https://app.harness.io/gitops" (index .metadata.annotations "agent_http_target") }}'
+              forceString: true
+            - name: harness.identity.accountIdentifier
+              value: '{{ .metadata.annotations.harness_account_id }}'
+              forceString: true
+            - name: harness.identity.orgIdentifier
+              value: '{{ .tenant }}'
+              forceString: true
+            - name: harness.identity.agentIdentifier
+              value: '{{ trimSuffix ".yaml" .path.filename | replace "-" "_" }}'
+              forceString: true
+            - name: agent.harnessName
+              value: '{{ trimSuffix ".yaml" .path.filename }}'
+              forceString: true
+            - name: agent.existingSecrets.agentToken
+              value: '{{ trimSuffix ".yaml" .path.filename }}-token'
+              forceString: true
+      # PE-managed HarnessGitopsAgent, HarnessGitopsProjectMappings, locked
+      # default + allowlisted team AppProjects, and own-namespace agent Role.
+      - path: charts/agent-onboarding
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}-onboarding'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/values/agents/agent-onboarding/values.yaml'
+            - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
+          parameters:
+            - name: agent.name
+              value: '{{ trimSuffix ".yaml" .path.filename }}'
+              forceString: true
+            - name: agent.tenant
+              value: '{{ .tenant }}'
+              forceString: true
+            - name: agent.environment
+              value: '{{ default "" (index . "environment") }}'
+              forceString: true
+            - name: agent.identifier
+              value: '{{ trimSuffix ".yaml" .path.filename | replace "-" "_" }}'
+              forceString: true
+            - name: agent.accountId
+              value: '{{ .metadata.annotations.harness_account_id }}'
+              forceString: true
+            - name: agent.apiKeySecretRef
+              value: 'harness-api-key-{{ .tenant }}'
+              forceString: true
+            - name: agent.tokenSecretRef
+              value: '{{ trimSuffix ".yaml" .path.filename }}-token'
+              forceString: true

@@ -38,8 +38,8 @@
 {{- else }}
 {{- $sources = required (printf "%s: sources, chartName or path is required" $name) $set.sources }}
 {{- end }}
-{{- $appsetSync := merge (deepCopy (default (dict) $set.syncPolicyAppSet)) (deepCopy $.Values.syncPolicyAppSet) }}
-{{- $sp := merge (deepCopy (default (dict) $set.syncPolicy)) (deepCopy $.Values.syncPolicy) }}
+{{- $appsetSync := mergeOverwrite (deepCopy $.Values.syncPolicyAppSet) (deepCopy (default (dict) $set.syncPolicyAppSet)) }}
+{{- $sp := mergeOverwrite (deepCopy $.Values.syncPolicy) (deepCopy (default (dict) $set.syncPolicy)) }}
 {{- with $set.syncOptions }}
 {{- $_ := set $sp "syncOptions" . }}
 {{- end }}

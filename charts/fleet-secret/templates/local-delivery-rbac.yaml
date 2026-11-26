@@ -1,19 +1,19 @@
-{{- if eq (default "agent" .Values.mode) "agent" }}
-{{- include "fleet-member.validate" . }}
-{{- $org := .Values.org.name }}
-{{- $tenant := .Values.org.tenant }}
-{{- $deliverySA := printf "%s-delivery" $org }}
-{{- $deliveryToken := printf "%s-delivery-token" $org }}
-# Dedicated least-privilege delivery identity for this fleet member's Argo CD.
+{{- if eq (default "local" .Values.mode) "local" }}
+{{- include "fleet-secret.validateLocal" . }}
+{{- $cluster := .Values.cluster.name }}
+{{- $tenant := .Values.cluster.tenant }}
+{{- $deliverySA := printf "%s-delivery" $cluster }}
+{{- $deliveryToken := printf "%s-delivery-token" $cluster }}
+# Dedicated least-privilege delivery identity for this local cluster target.
 # Never mounted into any pod (automountServiceAccountToken: false); Argo CD
-# authenticates with its token through the restricted cluster Secret.
+# authenticates with its token through Secret/<cluster>.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ $deliverySA | quote }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "fleet-member.labels" . | nindent 4 }}
+    {{- include "fleet-secret.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 automountServiceAccountToken: false
@@ -24,72 +24,38 @@ metadata:
   name: {{ $deliveryToken | quote }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "fleet-member.labels" . | nindent 4 }}
+    {{- include "fleet-secret.labels" . | nindent 4 }}
   annotations:
     kubernetes.io/service-account.name: {{ $deliverySA | quote }}
     argocd.argoproj.io/sync-wave: "-1"
 type: kubernetes.io/service-account-token
----
-# Upstream gitops-helm 1.3.0 omits read verbs on deployments/statefulsets in
-# its own namespaced gitops-agent Role when createClusterRoles: false. Grant
-# read-only access strictly inside this Org namespace so its health watchers
-# run without forbidden errors.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: gitops-agent-own-workloads
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "fleet-member.labels" . | nindent 4 }}
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-rules:
-  - apiGroups: ["apps"]
-    resources: ["deployments", "statefulsets"]
-    verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: gitops-agent-own-workloads
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "fleet-member.labels" . | nindent 4 }}
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: gitops-agent-own-workloads
-subjects:
-  - kind: ServiceAccount
-    name: gitops-agent
-    namespace: {{ .Release.Namespace }}
 {{- range $team, $t := .Values.teams }}
 {{- range (default (list) $t.namespaces) }}
 ---
+# Workload namespace: Prune=false,Delete=false guarantees deleting this cluster
+# registration revokes Argo CD access without deleting running workloads.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ . | quote }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "fleet-secret.labels" $ | nindent 4 }}
     app.kubernetes.io/part-of: {{ $team | quote }}
     tenant: {{ $tenant | quote }}
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted
   annotations:
-    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
     argocd.argoproj.io/sync-wave: "0"
     helm.sh/resource-policy: keep
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: fleet-workload-delivery
+  name: {{ printf "%s-delivery" $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "fleet-secret.labels" $ | nindent 4 }}
     app.kubernetes.io/part-of: {{ $team | quote }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -99,30 +65,30 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: fleet-workload-delivery
+  name: {{ printf "%s-delivery" $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "fleet-secret.labels" $ | nindent 4 }}
     app.kubernetes.io/part-of: {{ $team | quote }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: fleet-workload-delivery
+  name: {{ printf "%s-delivery" $cluster | quote }}
 subjects:
   - kind: ServiceAccount
     name: {{ $deliverySA | quote }}
     namespace: {{ $.Release.Namespace }}
-{{- if $.Values.agentReadLogs }}
+{{- if $.Values.local.agentReadLogs }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: fleet-agent-read-logs
+  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "fleet-secret.labels" $ | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 rules:
@@ -133,16 +99,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: fleet-agent-read-logs
+  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
   namespace: {{ . | quote }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "fleet-secret.labels" $ | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: fleet-agent-read-logs
+  name: {{ printf "%s-agent-read-logs" $cluster | quote }}
 subjects:
   - kind: ServiceAccount
     name: gitops-agent

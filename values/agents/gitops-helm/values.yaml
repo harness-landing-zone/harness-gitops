@@ -1,0 +1,57 @@
+# Base defaults for Org GitOps Agents (upstream harness/gitops-helm 1.3.0).
+# Applied FIRST in the valueFiles ladder — tenants may tune these in
+# tenants/<tenant>/values.yaml (e.g. resource sizing or logLevel).
+# Security invariants live in enforced.yaml, which is applied LAST.
+
+harness:
+  configMap:
+    logLevel: info
+    reconcile:
+      appsetReconcile: true
+
+agent:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+argo-cd:
+  configs:
+    params:
+      server.repo.server.timeout.seconds: "300"
+      controller.repo.server.timeout.seconds: "300"
+  controller:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  applicationSet:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  repoServer:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 512Mi
+  redis:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi

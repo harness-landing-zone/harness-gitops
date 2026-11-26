@@ -1,0 +1,57 @@
+# PE-managed onboarding for one lower-privilege Org GitOps Agent, driven by
+# agents/<name>.yaml and merged with tenants/<tenant>/teams/*/values.yaml.
+
+agent:
+  # DNS-1123 agent name (matches filename of agents/<name>.yaml and namespace).
+  name: ""
+  # Harness organization identifier (lowercase letters and digits only).
+  tenant: ""
+  # Optional environment label (e.g. dev, test, prod).
+  environment: ""
+  # Harness agent identifier (underscores, e.g. bu1_dev).
+  identifier: ""
+  accountId: ""
+  apiKeySecretRef: ""
+  tokenSecretRef: ""
+  operator: ARGO
+  type: MANAGED_ARGO_PROVIDER
+
+# Default server used when a team destination omits both server and name.
+defaultDestinationServer: https://kubernetes.default.svc.cluster.local
+
+allowedNamespaceResources:
+  - group: ""
+    kind: ConfigMap
+  - group: ""
+    kind: Pod
+  - group: ""
+    kind: Secret
+  - group: ""
+    kind: Service
+  - group: ""
+    kind: ServiceAccount
+  - group: ""
+    kind: PersistentVolumeClaim
+  - group: "apps"
+    kind: Deployment
+  - group: "apps"
+    kind: ReplicaSet
+  - group: "apps"
+    kind: StatefulSet
+  - group: "apps"
+    kind: DaemonSet
+  - group: "batch"
+    kind: Job
+  - group: "batch"
+    kind: CronJob
+  - group: "networking.k8s.io"
+    kind: Ingress
+  - group: "networking.k8s.io"
+    kind: NetworkPolicy
+  - group: "autoscaling"
+    kind: HorizontalPodAutoscaler
+  - group: "policy"
+    kind: PodDisruptionBudget
+
+# One entry per team, merged from tenants/<tenant>/teams/*/values.yaml.
+teams: {}

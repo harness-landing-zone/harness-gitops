@@ -1,7 +1,8 @@
-# Team A in org bu1: read by charts/fleet-member.
-# Creates namespace team-a-apps (with PSA + least-privilege workload RoleBinding
-# for bu1-delivery), allowlisted AppProject team-a, and Harness mapping to
-# bu1/team_a.
+# Team A in org bu1:
+# - charts/agent-onboarding creates allowlisted AppProject team-a and Harness
+#   mapping to bu1/team_a.
+# - charts/fleet-secret (mode: local) creates namespace team-a-apps with PSA
+#   and a least-privilege workload RoleBinding for the cluster's delivery SA.
 teams:
   team-a:
     projectId: team_a

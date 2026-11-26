@@ -1,5 +1,4 @@
-{{- if eq (default "agent" .Values.mode) "agent" }}
-{{- include "fleet-member.validate" . }}
+{{- include "agent-onboarding.validate" . }}
 {{- $a := .Values.agent }}
 apiVersion: gitops.harness.io/v1alpha1
 kind: HarnessGitopsAgent
@@ -7,7 +6,7 @@ metadata:
   name: {{ $a.name | quote }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "fleet-member.labels" . | nindent 4 }}
+    {{- include "agent-onboarding.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-options: Delete=false,SkipDryRunOnMissingResource=true
     argocd.argoproj.io/sync-wave: "1"
@@ -15,7 +14,7 @@ spec:
   name: {{ $a.name | quote }}
   identifier: {{ $a.identifier | quote }}
   accountId: {{ $a.accountId | quote }}
-  orgId: {{ .Values.org.tenant | quote }}
+  orgId: {{ $a.tenant | quote }}
   operator: {{ default "ARGO" $a.operator | quote }}
   scope: ORG
   type: {{ default "MANAGED_ARGO_PROVIDER" $a.type | quote }}
@@ -29,7 +28,7 @@ metadata:
   name: {{ $team | quote }}
   namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "fleet-member.labels" $ | nindent 4 }}
+    {{- include "agent-onboarding.labels" $ | nindent 4 }}
     app.kubernetes.io/part-of: {{ $team | quote }}
   annotations:
     argocd.argoproj.io/sync-options: Delete=false,SkipDryRunOnMissingResource=true
@@ -40,5 +39,4 @@ spec:
   appProject: {{ $team | quote }}
   projectId: {{ $t.projectId | quote }}
   autoCreateServiceEnv: false
-{{- end }}
 {{- end }}

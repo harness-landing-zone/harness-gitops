@@ -1,0 +1,74 @@
+# Registers one cluster Secret into an Argo CD / Harness GitOps Agent namespace,
+# driven by clusters/<agent>/<cluster>.yaml:
+#
+#   mode: local  - Least-privilege target on this same cluster: Delivery SA +
+#                  token, team workload namespaces (PSA + Delete=false),
+#                  workload RoleBindings, and a namespace-scoped ESO
+#                  SecretStore/ExternalSecret building Secret/<cluster.name>
+#                  with namespaces + clusterResources="false".
+#   mode: remote - Remote cluster registration: ESO ExternalSecret pulling
+#                  {server, caData, token} from a secret store into
+#                  Secret/<cluster.name>.
+mode: local
+
+cluster:
+  # DNS-1123 cluster Secret name (matches filename of clusters/<agent>/<cluster>.yaml).
+  name: ""
+  # Owner agent name / namespace (matches parent folder clusters/<agent>/).
+  agent: ""
+  # Harness organization identifier (required for mode: local; optional for mode: remote).
+  tenant: ""
+  # Optional environment label (e.g. dev, test, prod).
+  environment: ""
+
+# --- mode: local settings ----------------------------------------------------
+local:
+  # Uses kubernetes.default.svc.cluster.local so Argo CD's implicit in-cluster
+  # URL (https://kubernetes.default.svc) stays disabled via cluster.inClusterEnabled=false.
+  server: https://kubernetes.default.svc.cluster.local
+  refreshInterval: 5m
+  agentReadLogs: false
+
+# Least-privilege Kubernetes Role rules granted to <cluster>-delivery inside
+# each team's workload namespaces (mode: local).
+deliveryRoleRules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "services", "serviceaccounts", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Merged from tenants/<tenant>/teams/*/values.yaml when mode: local.
+teams: {}
+
+# --- mode: remote settings ---------------------------------------------------
+remote:
+  secretStoreKind: ClusterSecretStore
+  secretStore: hub-secret-store
+  # Path/key in the secret store. Empty defaults to "clusters/<cluster.name>".
+  remoteKey: ""
+  refreshInterval: 1m
+  # Optional namespace/cluster-resource restriction for remote Org Agent targets.
+  namespaces: ""
+  clusterResources: ""
+  # Optional extra labels (e.g. enable_external_secrets: "true").
+  labels: {}
+  # Annotations copied from the hub cluster Secret (repo_url, repo_revision,
+  # harness_account_id).
+  annotations: {}
