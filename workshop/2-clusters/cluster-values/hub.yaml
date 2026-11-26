@@ -3,4 +3,4 @@
 role: hub
 # The branch the hub's root ApplicationSet follows (rootAppSet.targetRevision
 # and the hub cluster Secret's repo_revision annotation).
-revision: main
+revision: ench/adding-public-charts

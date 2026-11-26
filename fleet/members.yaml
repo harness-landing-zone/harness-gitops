@@ -43,7 +43,9 @@ applicationSets:
           valueFiles:
             - '$values/tenants/{{ .tenant }}/values.yaml'
           # Security & identity settings enforced by PE over any tenant values.
-          valuesObject:
+          # Uses helm.values (YAML string) rather than valuesObject so Harness
+          # GitOps ApplicationSet schema validation passes cleanly.
+          values: |
             harnessAgent:
               enabled: false
             projectMappings: []
@@ -74,8 +76,12 @@ applicationSets:
               deploymentAnnotations:
                 argocd.argoproj.io/sync-wave: "2"
               resources:
-                requests: {cpu: 250m, memory: 256Mi}
-                limits: {cpu: 500m, memory: 512Mi}
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
             argo-cd:
               crds:
                 install: false
@@ -91,21 +97,37 @@ applicationSets:
                   application.instanceLabelKey: argocd.argoproj.io/instance
               controller:
                 resources:
-                  requests: {cpu: 250m, memory: 512Mi}
-                  limits: {cpu: 1, memory: 1Gi}
+                  requests:
+                    cpu: 250m
+                    memory: 512Mi
+                  limits:
+                    cpu: 1
+                    memory: 1Gi
               applicationSet:
                 resources:
-                  requests: {cpu: 100m, memory: 128Mi}
-                  limits: {cpu: 500m, memory: 256Mi}
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 256Mi
               repoServer:
                 resources:
-                  requests: {cpu: 250m, memory: 256Mi}
-                  limits: {cpu: 1, memory: 512Mi}
+                  requests:
+                    cpu: 250m
+                    memory: 256Mi
+                  limits:
+                    cpu: 1
+                    memory: 512Mi
                 extraContainers: []
               redis:
                 resources:
-                  requests: {cpu: 100m, memory: 128Mi}
-                  limits: {cpu: 500m, memory: 256Mi}
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 500m
+                    memory: 256Mi
       # PE-managed RBAC, Delivery SA, team namespaces, ESO restricted cluster
       # Secret, allowlisted AppProjects, HarnessGitopsAgent, and real mappings.
       - path: charts/fleet-member
@@ -114,7 +136,7 @@ applicationSets:
           ignoreMissingValueFiles: true
           valueFiles:
             - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
-          valuesObject:
+          values: |
             mode: agent
             org:
               name: '{{ trimSuffix ".yaml" .path.filename }}'
@@ -157,7 +179,7 @@ applicationSets:
           releaseName: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
           valueFiles:
             - '$values/{{ .path.path }}/{{ .path.filename }}'
-          valuesObject:
+          values: |
             mode: cluster
             org:
               name: '{{ trimSuffix ".yaml" .path.filename }}'

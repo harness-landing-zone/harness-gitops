@@ -13,9 +13,14 @@ locals {
   token_secret       = "hga-${local.env}-hub-token"
   hub_dir            = "${path.module}/../../hub"
   revision           = try(local.values.revision, "main")
-  gitops_server_host = try(local.setup.gitops_server_host, "https://app.harness.io/prod1/gitops")
-  agent_http_target  = try(local.setup.agent_http_target, "https://app.harness.io/gitops")
-  harness_helm_repo  = "https://harness.github.io/gitops-helm"
+  gitops_server_host  = try(local.setup.gitops_server_host, "https://app.harness.io/prod1/gitops")
+  agent_http_target   = try(local.setup.agent_http_target, "https://app.harness.io/gitops")
+  harness_helm_repo   = "https://harness.github.io/gitops-helm"
+  bootstrap_chart_dir = "${path.module}/../../charts/hub-bootstrap"
+  bootstrap_chart_sha = sha256(join("", [
+    for f in sort(fileset(local.bootstrap_chart_dir, "**")) :
+    filesha256("${local.bootstrap_chart_dir}/${f}")
+  ]))
 }
 
 resource "helm_release" "controller" {
@@ -86,7 +91,7 @@ resource "helm_release" "agent" {
 resource "helm_release" "hub_bootstrap" {
   count            = local.role == "hub" ? 1 : 0
   name             = "hga-hub-bootstrap"
-  chart            = "${path.module}/../../charts/hub-bootstrap"
+  chart            = local.bootstrap_chart_dir
   namespace        = "hga-hub-agent"
   create_namespace = false
   wait             = true
@@ -95,6 +100,8 @@ resource "helm_release" "hub_bootstrap" {
   values = [
     file("${local.hub_dir}/bootstrap.yaml"),
     yamlencode({
+      # Triggers Helm upgrade when any local template in charts/hub-bootstrap changes.
+      _chartSha = local.bootstrap_chart_sha
       hubCluster = {
         labels = { environment = local.env }
         annotations = {

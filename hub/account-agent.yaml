@@ -55,17 +55,21 @@ argo-cd:
                 hs.message = c.message
                 return hs
               end
-              if c.status == "False" and c.reason ~= nil and (string.find(c.reason, "Error") or string.find(c.reason, "Failed")) then
-                hs.status = "Degraded"
-                hs.message = c.message
-                return hs
-              end
             end
           end
           if obj.status.agentIdentifier ~= nil and obj.status.agentIdentifier ~= "" then
             hs.status = "Healthy"
             hs.message = "Agent registered (" .. obj.status.agentIdentifier .. ")"
             return hs
+          end
+          if obj.status.conditions ~= nil then
+            for _, c in ipairs(obj.status.conditions) do
+              if c.status == "False" and c.type ~= "Healthy" then
+                hs.status = "Degraded"
+                hs.message = c.message
+                return hs
+              end
+            end
           end
         end
         hs.status = "Progressing"

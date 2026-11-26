@@ -20,8 +20,10 @@
 {{- $_ := set $helm "ignoreMissingValueFiles" true }}
 {{- $_ := set $helm "valueFiles" $files }}
 {{- end }}
-{{- with $set.valuesObject }}
-{{- $_ := set $helm "valuesObject" . }}
+{{- if $set.values }}
+{{- $_ := set $helm "values" $set.values }}
+{{- else if $set.valuesObject }}
+{{- $_ := set $helm "values" (toYaml $set.valuesObject) }}
 {{- end }}
 {{- if $set.chartName }}
 {{- $sources = append $sources (dict

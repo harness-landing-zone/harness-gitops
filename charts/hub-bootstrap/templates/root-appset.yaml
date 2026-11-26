@@ -72,10 +72,16 @@ spec:
             releaseName: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
             valueFiles:
               - '$values/{{`{{ .path.path }}/{{ .path.filename }}`}}'
-            valuesObject:
-              group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
-              revision: {{ $revision | quote }}
-              project: {{ $project | quote }}
+            parameters:
+              - name: group
+                value: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+                forceString: true
+              - name: revision
+                value: {{ $revision | quote }}
+                forceString: true
+              - name: project
+                value: {{ $project | quote }}
+                forceString: true
       destination:
         namespace: {{ .Release.Namespace | quote }}
         name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
