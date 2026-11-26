@@ -1,3 +1,5 @@
+data "harness_platform_current_account" "this" {}
+
 resource "harness_platform_organization" "this" {
   identifier = var.org_id
   name       = var.org_name

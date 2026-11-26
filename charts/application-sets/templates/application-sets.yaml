@@ -1,7 +1,6 @@
 {{- $group := required "group is required: the installer sets it from the group file's name" .Values.group }}
 {{- range $name, $set := .Values.applicationSets }}
 {{- if ne $set.enabled false }}
-{{- /* Sources: either the entry's own list, or built from the add-on form. */}}
 {{- $sources := list }}
 {{- if or $set.chartName $set.path }}
 {{- if $set.sources }}
@@ -37,18 +36,27 @@
 {{- else }}
 {{- $sources = required (printf "%s: sources, chartName or path is required" $name) $set.sources }}
 {{- end }}
+{{- $appsetSync := merge (deepCopy (default (dict) $set.syncPolicyAppSet)) (deepCopy $.Values.syncPolicyAppSet) }}
+{{- $sp := merge (deepCopy (default (dict) $set.syncPolicy)) (deepCopy $.Values.syncPolicy) }}
+{{- with $set.syncOptions }}
+{{- $_ := set $sp "syncOptions" . }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: {{ $name }}
+  name: {{ printf "%s-%s" $group $name | quote }}
   labels:
     group: {{ $group }}
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
+  {{- with $set.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   syncPolicy:
-    {{- toYaml $.Values.syncPolicyAppSet | nindent 4 }}
+    {{- toYaml $appsetSync | nindent 4 }}
   {{- $clusters := dict "clusters" (dict "selector" (required (printf "%s: selector is required" $name) $set.selector)) }}
   generators:
     {{- if $set.gitFiles }}
@@ -60,8 +68,18 @@ spec:
               revision: {{ $.Values.revision | quote }}
               files:
                 - path: {{ $set.gitFiles | quote }}
+      {{- with $set.postSelector }}
+      selector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     {{- else }}
-    {{- toYaml (list $clusters) | nindent 4 }}
+    - clusters:
+        selector:
+          {{- toYaml $set.selector | nindent 10 }}
+      {{- with $set.postSelector }}
+      selector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     {{- end }}
   template:
     metadata:
@@ -69,13 +87,13 @@ spec:
       labels:
         {{- toYaml (merge (dict "group" $group) (deepCopy (default (dict) $set.labels)) $.Values.labels) | nindent 8 }}
     spec:
-      project: {{ $.Values.project }}
+      project: {{ default $.Values.project $set.project | quote }}
       destination:
         name: {{ dig "name" "{{ .name }}" $set.destination | quote }}
         namespace: {{ required (printf "%s: destination.namespace is required" $name) $set.destination.namespace | quote }}
-      {{- $sp := deepCopy $.Values.syncPolicy }}
-      {{- with $set.syncOptions }}
-      {{- $_ := set $sp "syncOptions" . }}
+      {{- with $set.ignoreDifferences }}
+      ignoreDifferences:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       syncPolicy:
         {{- toYaml $sp | nindent 8 }}

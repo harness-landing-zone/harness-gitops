@@ -1,0 +1,61 @@
+{{- if eq (default "agent" .Values.mode) "cluster" }}
+{{- include "fleet-member.validateCommon" . }}
+{{- $name := .Values.org.name }}
+{{- $tenant := .Values.org.tenant }}
+{{- $env := .Values.org.environment }}
+{{- $rc := .Values.remoteCluster }}
+{{- $store := required "remoteCluster.secretStore is required when mode is cluster" $rc.secretStore }}
+{{- $remoteKey := default (printf "clusters/%s" $name) $rc.remoteKey }}
+# Registers a remote cluster as an Argo CD cluster Secret on the hub via ESO.
+# Expected keys at remoteKey in the ClusterSecretStore: server, caData, token.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fleet-member.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  refreshInterval: {{ default "1m" $rc.refreshInterval }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $store | quote }}
+  data:
+    {{- range list "server" "caData" "token" }}
+    - secretKey: {{ . }}
+      remoteRef:
+        key: {{ $remoteKey | quote }}
+        property: {{ . }}
+    {{- end }}
+  target:
+    name: {{ $name | quote }}
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      engineVersion: v2
+      metadata:
+        labels:
+          argocd.argoproj.io/secret-type: cluster
+          fleet_member: cluster
+          type: cluster
+          tenant: {{ $tenant | quote }}
+          {{- with $env }}
+          environment: {{ . | quote }}
+          {{- end }}
+          {{- range $k, $v := $rc.labels }}
+          {{- if has $k (list "argocd.argoproj.io/secret-type" "fleet_member" "type" "tenant" "environment") }}
+          {{- fail (printf "remoteCluster.labels: %q is reserved and set by the chart" $k) }}
+          {{- end }}
+          {{ $k }}: {{ $v | quote }}
+          {{- end }}
+        {{- with $rc.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      data:
+        name: {{ $name | quote }}
+        server: "{{`{{ .server }}`}}"
+        config: '{"bearerToken":"{{`{{ .token }}`}}","tlsClientConfig":{"caData":"{{`{{ .caData }}`}}"}}'
+{{- end }}

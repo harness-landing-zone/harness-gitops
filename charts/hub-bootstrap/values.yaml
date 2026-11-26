@@ -1,0 +1,50 @@
+# Day-0 glue for the PE Admin hub. Installed after upstream gitops-helm (which
+# installs the Argo CD CRDs), so every resource here is a plain Helm object
+# with no hooks or delete/recreate churn on upgrade.
+
+apiKeySecret:
+  create: false
+  name: harness-api-key-secret
+  namespace: hga-system
+  value: ""
+  extra: {}
+  keep: true
+
+gitSecret:
+  create: false
+  name: bootstrap-repo
+  url: ""
+  githubAppID: ""
+  githubAppInstallationID: ""
+  githubAppPrivateKey: ""
+  githubAppPrivateKeyB64: ""
+  githubAppJson: ""
+  repoName: ""
+  project: ""
+  credsTemplate: false
+
+hubCluster:
+  enabled: false
+  name: hub-cluster
+  server: https://kubernetes.default.svc
+  fleetMember: hub-cluster
+  labels: {}
+  annotations: {}
+
+# Root ApplicationSet: reads fleet/*.yaml and installs charts/application-sets
+# once per fleet file into this Argo CD namespace.
+rootAppSet:
+  enabled: false
+  name: fleet-root
+  repoURL: ""
+  fleetPath: fleet
+  # Fleet files to install by name without .yaml. Empty = every file in fleetPath.
+  sets: []
+  targetRevision: HEAD
+  destinationName: ""
+  project: platform-admin
+  projectDescription: Platform engineering admin AppProject for the hub
+  createProject: true
+  allowedChartRepos:
+    - https://harness.github.io/gitops-helm
+    - https://charts.external-secrets.io

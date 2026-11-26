@@ -1,0 +1,24 @@
+# Day-0 static values for charts/hub-bootstrap, installed by
+# workshop/2-clusters/hub.tf immediately after upstream gitops-helm.
+# Per-hub inputs and sensitive API keys are layered in by hub.tf.
+
+apiKeySecret:
+  create: true
+  name: harness-api-key-secret
+  namespace: hga-system
+  keep: true
+
+hubCluster:
+  enabled: true
+  name: hub-cluster
+  labels:
+    # Single-cluster Reference Architecture needs ESO only (no OpenBao): ESO's
+    # local Kubernetes SecretStore reads each fleet member's delivery SA token.
+    enable_external_secrets: "true"
+
+rootAppSet:
+  enabled: true
+  name: fleet-root
+  fleetPath: fleet
+  project: platform-admin
+  createProject: true

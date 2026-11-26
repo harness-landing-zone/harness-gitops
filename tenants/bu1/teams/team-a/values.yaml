@@ -1,0 +1,15 @@
+# Team A in org bu1: read by charts/fleet-member.
+# Creates namespace team-a-apps (with PSA + least-privilege workload RoleBinding
+# for bu1-delivery), allowlisted AppProject team-a, and Harness mapping to
+# bu1/team_a.
+teams:
+  team-a:
+    projectId: team_a
+    description: Team A (bu1)
+    sourceRepos:
+      - https://github.com/argoproj/argocd-example-apps.git
+    namespaces:
+      - team-a-apps
+    destinations:
+      - server: https://kubernetes.default.svc.cluster.local
+        namespace: team-a-*

@@ -1,20 +1,15 @@
-# Day-0 values for the HGA controller, installed by workshop/2-clusters
-# (hub.tf, release hga-controller).
+# Day-0 values for the official upstream harness-gitops-agent-controller chart
+# (https://harness.github.io/gitops-helm, v0.1.0), installed by
+# workshop/2-clusters/hub.tf into hga-system.
 
-# The official image is public. No tag here: the chart's appVersion is the
-# tested controller version.
 image:
   repository: harness/gitops-agent-bootstrap-controller
 
-# The chart templates its CRDs so they upgrade with it. keep leaves existing
-# agent CRs in place on a helm uninstall.
 crds:
   enabled: true
   keep: true
 
 manager:
-  # apiKeySecretNamespace is left unset on purpose: it defaults to this
-  # release namespace, hga-system. The controller reads the ONE central
-  # API-key Secret from there for every agent CR in every namespace. The hub
-  # agent release (hub/account-agent.yaml) creates that Secret.
+  # Defaults to this release namespace (hga-system). The controller reads
+  # harness-api-key-secret (ACCOUNT) and harness-api-key-<tenant> (ORG) from here.
   zapDevelopment: false

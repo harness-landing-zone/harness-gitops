@@ -27,3 +27,11 @@ output "project_id" {
 output "repo_url" {
   value = "https://github.com/${var.github_org}/harness-gitops.git"
 }
+
+output "gitops_server_host" {
+  value = var.gitops_server_host
+}
+
+output "agent_http_target" {
+  value = var.agent_http_target
+}

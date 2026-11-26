@@ -1,0 +1,91 @@
+{{- $as := .Values.rootAppSet }}
+{{- if and $as $as.enabled }}
+{{- $repoURL := default (.Values.gitSecret).url $as.repoURL }}
+{{- $revision := default "HEAD" $as.targetRevision }}
+{{- $project := default "platform-admin" $as.project }}
+{{- $fleetPath := default "fleet" $as.fleetPath }}
+{{- if not $repoURL }}
+{{- fail "rootAppSet.repoURL is required when gitSecret.url is not set" }}
+{{- end }}
+{{- if $as.createProject }}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $project | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hub-bootstrap.labels" . | nindent 4 }}
+spec:
+  description: {{ default "Platform engineering admin AppProject" $as.projectDescription | quote }}
+  sourceRepos:
+    - {{ $repoURL | quote }}
+    {{- range $as.allowedChartRepos }}
+    - {{ . | quote }}
+    {{- end }}
+  destinations:
+    - namespace: "*"
+      server: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+{{- end }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ default "fleet-root" $as.name | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hub-bootstrap.labels" . | nindent 4 }}
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    applicationsSync: create-update
+  generators:
+    - git:
+        repoURL: {{ $repoURL | quote }}
+        revision: {{ $revision | quote }}
+        files:
+          {{- range (default (list "*") $as.sets) }}
+          - path: {{ printf "%s/%s.yaml" $fleetPath . | quote }}
+          {{- end }}
+  template:
+    metadata:
+      name: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+      labels:
+        fleet: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+    spec:
+      project: {{ $project | quote }}
+      sources:
+        - repoURL: {{ $repoURL | quote }}
+          targetRevision: {{ $revision | quote }}
+          ref: values
+        - repoURL: {{ $repoURL | quote }}
+          targetRevision: {{ $revision | quote }}
+          path: charts/application-sets
+          helm:
+            releaseName: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+            valueFiles:
+              - '$values/{{`{{ .path.path }}/{{ .path.filename }}`}}'
+            valuesObject:
+              group: '{{`{{ trimSuffix ".yaml" .path.filename }}`}}'
+              revision: {{ $revision | quote }}
+              project: {{ $project | quote }}
+      destination:
+        namespace: {{ .Release.Namespace | quote }}
+        name: {{ default (default "hub-cluster" (.Values.hubCluster).name) $as.destinationName | quote }}
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: false
+        retry:
+          limit: 20
+          backoff:
+            duration: 10s
+            maxDuration: 1m
+{{- end }}

@@ -1,17 +1,17 @@
-# Copy to terraform.tfvars (git-ignored) and fill in. Placeholders only.
-account_id = "REPLACE_WITH_HARNESS_ACCOUNT_ID"
+# Copy to terraform.tfvars (git-ignored) ONLY if you want to override defaults.
+# HARNESS_ACCOUNT_ID and HARNESS_PLATFORM_API_KEY are read from the environment.
 
-# Defaults; change only if you need to.
-# github_org     = "harness-landing-zone"  # owner of your fork, if you use one
-# org_id         = "gitops_reference"
-# org_name       = "GitOps Reference Architecture"
-# project_id     = "gitops_admin"
-# project_name   = "GitOps Admin"
-# environment_id = "test"
+# github_org         = "harness-landing-zone"  # owner of your fork, if you use one
+# org_id             = "gitops_reference"
+# org_name           = "GitOps Reference Architecture"
+# project_id         = "gitops_admin"
+# project_name       = "GitOps Admin"
+# environment_id     = "test"
+# gitops_server_host = "https://app.harness.io/prod1/gitops"
+# agent_http_target  = "https://app.harness.io/gitops"
 
-# The tenants: one organization each, one project per team. Changing these
-# identifiers needs a fork, because the repository names them too (see
-# "Your own names" in the workshop README).
+# One Harness org per tenant (lowercase letters and digits only), one project
+# per team. Changing these identifiers needs a fork matching tenants/<tenant>/.
 # business_units = {
 #   bu1 = {
 #     name     = "Business Unit 1"

@@ -1,0 +1,170 @@
+# Fleet members: driven by one file per member in fleet-members/<name>.yaml.
+# Each member file declares `type`:
+#
+#   type: agent   -> deploys a lower-privilege Org GitOps Agent on this cluster
+#                    (official upstream harness/gitops-helm 1.3.0 with ZERO
+#                    ClusterRoles and ZERO CRDs + charts/fleet-member mode: agent).
+#   type: cluster -> registers a remote cluster Secret in the PE Admin Argo CD
+#                    via ESO (charts/fleet-member mode: cluster).
+applicationSets:
+
+  # Matches fleet-members/*.yaml where type: agent.
+  agents:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: fleet-members/*.yaml
+    postSelector:
+      matchLabels:
+        type: agent
+    name: '{{ trimSuffix ".yaml" .path.filename }}'
+    labels:
+      cluster: '{{ .name }}'
+      member: '{{ trimSuffix ".yaml" .path.filename }}'
+      type: agent
+      tenant: '{{ .tenant }}'
+      environment: '{{ default "" (index . "environment") }}'
+    destination:
+      name: hub-cluster
+      namespace: '{{ default (printf "org-%s" .tenant) (index . "namespace") }}'
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    sources:
+      - ref: values
+      # Official upstream Harness GitOps Agent chart — zero vendored tarballs,
+      # zero ClusterRoles, zero CRDs.
+      - repoURL: https://harness.github.io/gitops-helm
+        chart: gitops-helm
+        targetRevision: 1.3.0
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/tenants/{{ .tenant }}/values.yaml'
+          # Security & identity settings enforced by PE over any tenant values.
+          valuesObject:
+            harnessAgent:
+              enabled: false
+            projectMappings: []
+            appProject:
+              enabled: false
+            upgrader:
+              enabled: false
+            harness:
+              createClusterRoles: false
+              gitopsServerHost: '{{ default "https://app.harness.io/prod1/gitops" (index .metadata.annotations "gitops_server_host") }}'
+              identity:
+                accountIdentifier: '{{ .metadata.annotations.harness_account_id }}'
+                orgIdentifier: '{{ .tenant }}'
+                projectIdentifier: ""
+                agentIdentifier: '{{ trimSuffix ".yaml" .path.filename | replace "-" "_" }}'
+              configMap:
+                http:
+                  agentHttpTarget: '{{ default "https://app.harness.io/gitops" (index .metadata.annotations "agent_http_target") }}'
+                logLevel: info
+                reconcile:
+                  appsetReconcile: true
+            agent:
+              harnessName: '{{ trimSuffix ".yaml" .path.filename }}'
+              existingSecrets:
+                agentToken: '{{ trimSuffix ".yaml" .path.filename }}-token'
+              # Starts in wave 2 right after wave 1 HarnessGitopsAgent has written
+              # the token Secret, and before wave 3 project mappings verify.
+              deploymentAnnotations:
+                argocd.argoproj.io/sync-wave: "2"
+              resources:
+                requests: {cpu: 250m, memory: 256Mi}
+                limits: {cpu: 500m, memory: 512Mi}
+            argo-cd:
+              crds:
+                install: false
+              extraObjects: []
+              configs:
+                clusterCredentials: null
+                params:
+                  server.repo.server.timeout.seconds: "300"
+                  controller.repo.server.timeout.seconds: "300"
+                cm:
+                  cluster.inClusterEnabled: "false"
+                  resource.respectRBAC: "normal"
+                  application.instanceLabelKey: argocd.argoproj.io/instance
+              controller:
+                resources:
+                  requests: {cpu: 250m, memory: 512Mi}
+                  limits: {cpu: 1, memory: 1Gi}
+              applicationSet:
+                resources:
+                  requests: {cpu: 100m, memory: 128Mi}
+                  limits: {cpu: 500m, memory: 256Mi}
+              repoServer:
+                resources:
+                  requests: {cpu: 250m, memory: 256Mi}
+                  limits: {cpu: 1, memory: 512Mi}
+                extraContainers: []
+              redis:
+                resources:
+                  requests: {cpu: 100m, memory: 128Mi}
+                  limits: {cpu: 500m, memory: 256Mi}
+      # PE-managed RBAC, Delivery SA, team namespaces, ESO restricted cluster
+      # Secret, allowlisted AppProjects, HarnessGitopsAgent, and real mappings.
+      - path: charts/fleet-member
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}-member'
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
+          valuesObject:
+            mode: agent
+            org:
+              name: '{{ trimSuffix ".yaml" .path.filename }}'
+              tenant: '{{ .tenant }}'
+              environment: '{{ default "" (index . "environment") }}'
+            clusterSecret:
+              name: '{{ default (printf "%s-workloads" (trimSuffix ".yaml" .path.filename)) (index . "clusterSecretName") }}'
+              server: https://kubernetes.default.svc.cluster.local
+            agent:
+              name: '{{ trimSuffix ".yaml" .path.filename }}'
+              identifier: '{{ trimSuffix ".yaml" .path.filename | replace "-" "_" }}'
+              accountId: '{{ .metadata.annotations.harness_account_id }}'
+              apiKeySecretRef: 'harness-api-key-{{ .tenant }}'
+              tokenSecretRef: '{{ trimSuffix ".yaml" .path.filename }}-token'
+
+  # Matches fleet-members/*.yaml where type: cluster.
+  # Registers a remote cluster as an Argo CD cluster Secret on the hub via ESO.
+  clusters:
+    selector:
+      matchLabels:
+        fleet_member: hub-cluster
+    gitFiles: fleet-members/*.yaml
+    postSelector:
+      matchLabels:
+        type: cluster
+    name: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
+    labels:
+      cluster: '{{ trimSuffix ".yaml" .path.filename }}'
+      member: '{{ trimSuffix ".yaml" .path.filename }}'
+      type: cluster
+      tenant: '{{ .tenant }}'
+      environment: '{{ default "" (index . "environment") }}'
+    destination:
+      name: hub-cluster
+      namespace: hga-hub-agent
+    sources:
+      - ref: values
+      - path: charts/fleet-member
+        helm:
+          releaseName: '{{ trimSuffix ".yaml" .path.filename }}-cluster'
+          valueFiles:
+            - '$values/{{ .path.path }}/{{ .path.filename }}'
+          valuesObject:
+            mode: cluster
+            org:
+              name: '{{ trimSuffix ".yaml" .path.filename }}'
+              tenant: '{{ .tenant }}'
+              environment: '{{ default "" (index . "environment") }}'
+            remoteCluster:
+              annotations:
+                repo_url: '{{ .metadata.annotations.repo_url }}'
+                repo_revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
+                harness_account_id: '{{ .metadata.annotations.harness_account_id }}'

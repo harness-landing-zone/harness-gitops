@@ -19,7 +19,7 @@ resource "harness_platform_service_account" "controller" {
   identifier = "hga_controller"
   name       = "HGA Controller"
   email      = "hga_controller@service.harness.io"
-  account_id = var.account_id
+  account_id = data.harness_platform_current_account.this.account_id
 }
 
 resource "harness_platform_role_assignments" "controller" {
@@ -35,7 +35,7 @@ resource "harness_platform_role_assignments" "controller" {
 resource "harness_platform_apikey" "controller" {
   identifier  = "hga_controller"
   name        = "HGA Controller"
-  account_id  = var.account_id
+  account_id  = data.harness_platform_current_account.this.account_id
   parent_id   = harness_platform_service_account.controller.id
   apikey_type = "SERVICE_ACCOUNT"
 }
@@ -43,7 +43,7 @@ resource "harness_platform_apikey" "controller" {
 resource "harness_platform_token" "controller" {
   identifier  = "hga_controller"
   name        = "HGA Controller"
-  account_id  = var.account_id
+  account_id  = data.harness_platform_current_account.this.account_id
   parent_id   = harness_platform_service_account.controller.id
   apikey_id   = harness_platform_apikey.controller.id
   apikey_type = "SERVICE_ACCOUNT"

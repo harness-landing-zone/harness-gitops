@@ -1,61 +1,111 @@
-# Day-0 values for the ACCOUNT-scoped hub agent, installed by
-# workshop/2-clusters (hub.tf, release hga-hub-agent) from charts/gitops-agent.
-# Static values only. hub.tf adds the per-hub inputs on top (agent name and
-# identifier, token Secret, account, environment, repository and revision, the
-# hub-admin project mapping) and the keys through set_sensitive, so secrets
-# reach only Kubernetes and never git.
+# Day-0 static values for the PE Admin ACCOUNT-scoped agent, installed directly
+# from the official upstream gitops-helm chart (https://harness.github.io/gitops-helm,
+# v1.3.0) by workshop/2-clusters/hub.tf into hga-hub-agent.
 #
-# No image versions are set here on purpose: the official chart's own defaults
-# for Argo CD, redis and the agent are the tested combination.
+# Per-hub identity, projectMappings, and gitopsServerHost are layered in by hub.tf.
+# Day-0 glue (API keys, hub-cluster Secret, platform-admin AppProject, root
+# ApplicationSet) is installed immediately after by charts/hub-bootstrap.
 
-# The ONE central API-key Secret, harness-api-key-secret: gitops-helm's
-# default for gitopsAgent.harnessAgent.spec.apiKeySecretRef, which this file
-# leaves unset. The controller reads it from its own namespace, hga-system,
-# for this hub agent. Hub-managed spoke agents use their tenant's key:
-# hub.tf adds one entry per tenant under apiKeySecret.extra
-# (harness-api-key-TENANT, named in spec.apiKeySecretRef by the agents group).
-apiKeySecret:
-  create: true
-  namespace: hga-system
-
-# The group installer selects the hub by fleet_member and reads its repository
-# settings from the annotations hub.tf sets.
-hubCluster:
+harnessAgent:
   enabled: true
-  labels:
-    # The add-ons this hub runs (groups/addons.yaml selects on these).
-    enable_external_secrets: "true"
-    enable_openbao: "true"
+  spec:
+    scope: ACCOUNT
 
-rootAppSet:
-  enabled: true
-  project: default
-  # Creates AppProject default as a hook, see gitopsAgent.appProject below.
-  createProject: true
+appProject:
+  enabled: false
 
-gitopsAgent:
-  enabled: true
-  harnessAgent:
-    enabled: true
-    spec:
-      scope: ACCOUNT
-  # The official appProject template refuses to render until the AppProject
-  # CRD exists, and this release installs that CRD, so it stays off. The root
-  # ApplicationSet hook creates the AppProject named by rootAppSet.project
-  # instead (rootAppSet.createProject); description is read from here.
-  appProject:
-    enabled: false
-    description: Admin AppProject for the hub
-  harness:
-    gitopsServerHost: https://app.harness.io/prod1/gitops
-    configMap:
-      logLevel: INFO
-      reconcile:
-        appsetReconcile: true
-  argo-cd:
-    crds:
-      install: true
-      keep: true
-    configs:
-      cm:
-        cluster.inClusterEnabled: true
+# Disabled: the controller manages the agent's token Secret (existingSecrets).
+upgrader:
+  enabled: false
+
+harness:
+  createClusterRoles: true
+  configMap:
+    logLevel: INFO
+    reconcile:
+      appsetReconcile: true
+
+agent:
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+
+argo-cd:
+  crds:
+    install: true
+    keep: true
+  configs:
+    params:
+      server.repo.server.timeout.seconds: "300"
+      controller.repo.server.timeout.seconds: "300"
+    cm:
+      cluster.inClusterEnabled: "true"
+      # Distinct tracking label for the PE Admin Argo CD so it never collides
+      # with lower-privilege Org Argo CDs running on the same cluster.
+      application.instanceLabelKey: pe.argocd.argoproj.io/instance
+      # Custom health checks for Harness GitOps CRDs so sync waves wait for
+      # registration/mappings and failures surface as Degraded.
+      resource.customizations.health.gitops.harness.io_HarnessGitopsAgent: |
+        hs = {}
+        if obj.status ~= nil then
+          if obj.status.conditions ~= nil then
+            for _, c in ipairs(obj.status.conditions) do
+              if c.type == "Healthy" and c.status == "True" then
+                hs.status = "Healthy"
+                hs.message = c.message
+                return hs
+              end
+              if c.status == "False" and c.reason ~= nil and (string.find(c.reason, "Error") or string.find(c.reason, "Failed")) then
+                hs.status = "Degraded"
+                hs.message = c.message
+                return hs
+              end
+            end
+          end
+          if obj.status.agentIdentifier ~= nil and obj.status.agentIdentifier ~= "" then
+            hs.status = "Healthy"
+            hs.message = "Agent registered (" .. obj.status.agentIdentifier .. ")"
+            return hs
+          end
+        end
+        hs.status = "Progressing"
+        hs.message = "Waiting for controller to register Harness GitOps agent"
+        return hs
+      resource.customizations.health.gitops.harness.io_HarnessGitopsProjectMapping: |
+        hs = {}
+        if obj.status ~= nil and obj.status.conditions ~= nil then
+          for _, c in ipairs(obj.status.conditions) do
+            if c.type == "Ready" then
+              if c.status == "True" then
+                hs.status = "Healthy"
+                hs.message = c.message
+                return hs
+              else
+                hs.status = "Progressing"
+                hs.message = c.message
+                return hs
+              end
+            end
+          end
+        end
+        hs.status = "Progressing"
+        hs.message = "Waiting for Harness project mapping verification"
+        return hs
+  controller:
+    resources:
+      requests: {cpu: 500m, memory: 1Gi}
+      limits: {cpu: 1, memory: 2Gi}
+  applicationSet:
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {cpu: 500m, memory: 512Mi}
+  repoServer:
+    resources:
+      requests: {cpu: 500m, memory: 512Mi}
+      limits: {cpu: 1, memory: 1Gi}
+    # Harness CMP plugin sidecar off by default (saves 1 CPU / 1Gi per Argo CD).
+    extraContainers: []
+  redis:
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 512Mi}

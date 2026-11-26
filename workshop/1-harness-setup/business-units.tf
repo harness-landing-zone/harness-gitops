@@ -1,5 +1,6 @@
-# One Harness org per tenant (here a business unit), one project per team.
-# The teams are AppProjects mapped onto these projects.
+# One Harness org per tenant (business unit), one project per team, plus each
+# tenant's org-scoped controller service account (least-privilege GitOps agent
+# and AppProject mapping rights inside that org only).
 locals {
   bu_projects = merge([
     for bu, v in var.business_units : {
@@ -23,11 +24,6 @@ resource "harness_platform_project" "team" {
   tags       = ["purpose:reference-architecture"]
 }
 
-# Each tenant's own controller identity: an org-scoped service account that may
-# only manage GitOps agents and their project mappings inside that org. Its
-# token is the key the hub's controller uses for that tenant's hub-managed
-# spokes (apiKeySecretRef harness-api-key-<bu>), so their agents never ride on
-# the account-level key.
 resource "harness_platform_roles" "bu_controller" {
   for_each   = var.business_units
   identifier = "hga_controller_${each.key}"
@@ -49,7 +45,7 @@ resource "harness_platform_service_account" "bu_controller" {
   identifier = "hga_controller_${each.key}"
   name       = "HGA Controller ${each.key}"
   email      = "hga_controller_${each.key}@service.harness.io"
-  account_id = var.account_id
+  account_id = data.harness_platform_current_account.this.account_id
   org_id     = harness_platform_organization.bu[each.key].id
 }
 
@@ -69,7 +65,7 @@ resource "harness_platform_apikey" "bu_controller" {
   for_each    = var.business_units
   identifier  = "hga_controller_${each.key}"
   name        = "HGA Controller ${each.key}"
-  account_id  = var.account_id
+  account_id  = data.harness_platform_current_account.this.account_id
   org_id      = harness_platform_organization.bu[each.key].id
   parent_id   = harness_platform_service_account.bu_controller[each.key].id
   apikey_type = "SERVICE_ACCOUNT"
@@ -79,7 +75,7 @@ resource "harness_platform_token" "bu_controller" {
   for_each    = var.business_units
   identifier  = "hga_controller_${each.key}"
   name        = "HGA Controller ${each.key}"
-  account_id  = var.account_id
+  account_id  = data.harness_platform_current_account.this.account_id
   org_id      = harness_platform_organization.bu[each.key].id
   parent_id   = harness_platform_service_account.bu_controller[each.key].id
   apikey_id   = harness_platform_apikey.bu_controller[each.key].id

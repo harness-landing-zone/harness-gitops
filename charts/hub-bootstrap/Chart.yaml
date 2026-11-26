@@ -1,0 +1,9 @@
+apiVersion: v2
+name: hub-bootstrap
+description: >-
+  Day-0 hub glue installed right after upstream harness/gitops-helm:
+  controller API-key Secrets, optional private Git repo Secret, hub cluster
+  Secret, platform-admin AppProject, and the root ApplicationSet that installs
+  groups/*.yaml.
+type: application
+version: 0.1.0

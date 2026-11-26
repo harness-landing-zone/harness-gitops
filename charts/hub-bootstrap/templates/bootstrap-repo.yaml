@@ -1,0 +1,86 @@
+{{- $git := .Values.gitSecret }}
+{{- if and $git $git.create }}
+{{- $name := default "bootstrap-repo" $git.name }}
+{{- $url := required "gitSecret.url is required" $git.url }}
+{{- $appID := $git.githubAppID }}
+{{- $installationID := $git.githubAppInstallationID }}
+{{- $privateKey := $git.githubAppPrivateKey }}
+{{- $privateKeyB64 := $git.githubAppPrivateKeyB64 }}
+{{- with $git.githubAppJson }}
+{{- if or $appID $installationID $privateKey $privateKeyB64 }}
+{{- fail "gitSecret: set githubAppJson or the individual githubApp* fields, not both" }}
+{{- end }}
+{{- $app := fromJson . }}
+{{- if hasKey $app "Error" }}
+{{- fail (printf "gitSecret.githubAppJson is not valid JSON: %s" (get $app "Error")) }}
+{{- end }}
+{{- $appID = get $app "githubAppID" }}
+{{- $installationID = get $app "githubAppInstallationID" }}
+{{- $privateKey = get $app "githubAppPrivateKey" }}
+{{- $privateKeyB64 = get $app "githubAppPrivateKeyB64" }}
+{{- end }}
+{{- if not (and $appID $installationID) }}
+{{- fail "gitSecret: githubAppID and githubAppInstallationID are required" }}
+{{- end }}
+{{- if or (not (kindIs "string" $appID)) (not (kindIs "string" $installationID)) }}
+{{- fail "gitSecret: githubAppID and githubAppInstallationID must be quoted strings" }}
+{{- end }}
+{{- if and $privateKey $privateKeyB64 }}
+{{- fail "gitSecret: set githubAppPrivateKey or githubAppPrivateKeyB64, not both" }}
+{{- end }}
+{{- if not (or $privateKey $privateKeyB64) }}
+{{- fail "gitSecret: githubAppPrivateKey or githubAppPrivateKeyB64 is required" }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+    {{- include "hub-bootstrap.labels" . | nindent 4 }}
+type: Opaque
+{{- if $privateKeyB64 }}
+data:
+  githubAppPrivateKey: {{ $privateKeyB64 | quote }}
+{{- end }}
+stringData:
+  type: git
+  url: {{ $url | quote }}
+  {{- with $git.repoName }}
+  name: {{ . | quote }}
+  {{- end }}
+  {{- with $git.project }}
+  project: {{ . | quote }}
+  {{- end }}
+  githubAppID: {{ $appID | quote }}
+  githubAppInstallationID: {{ $installationID | quote }}
+  {{- with $privateKey }}
+  githubAppPrivateKey: |-
+    {{- . | trim | nindent 4 }}
+  {{- end }}
+{{- if $git.credsTemplate }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-creds
+  namespace: {{ .Release.Namespace }}
+  labels:
+    argocd.argoproj.io/secret-type: repo-creds
+    {{- include "hub-bootstrap.labels" . | nindent 4 }}
+type: Opaque
+{{- if $privateKeyB64 }}
+data:
+  githubAppPrivateKey: {{ $privateKeyB64 | quote }}
+{{- end }}
+stringData:
+  url: {{ $url | quote }}
+  githubAppID: {{ $appID | quote }}
+  githubAppInstallationID: {{ $installationID | quote }}
+  {{- with $privateKey }}
+  githubAppPrivateKey: |-
+    {{- . | trim | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
