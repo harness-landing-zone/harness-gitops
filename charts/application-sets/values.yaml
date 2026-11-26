@@ -12,14 +12,12 @@ syncPolicyAppSet:
   preserveResourcesOnDeletion: true
   applicationsSync: create-update
 
+# Omit retry.limit by default: Harness's GitOps protobuf-JSON API serializes
+# int64 fields like retry.limit as quoted strings ("20"), which causes Harness
+# UI Validate/Save to fail with "cannot unmarshal string into int64".
 syncPolicy:
   automated:
     selfHeal: true
     prune: false
-  retry:
-    limit: 20
-    backoff:
-      duration: 10s
-      maxDuration: 1m
 
 applicationSets: {}
