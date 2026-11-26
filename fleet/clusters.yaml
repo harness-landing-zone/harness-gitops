@@ -40,15 +40,11 @@ applicationSets:
           valueFiles:
             - '$values/tenants/{{ default "none" (index . "tenant") }}/teams/*/values.yaml'
             - '$values/{{ .path.path }}/{{ .path.filename }}'
+          # Only what is computed from the filename or the hub cluster Secret;
+          # mode, tenant and environment come from the cluster file itself.
           parameters:
             - name: cluster.name
               value: '{{ trimSuffix ".yaml" .path.filename }}'
-              forceString: true
-            - name: cluster.tenant
-              value: '{{ default "" (index . "tenant") }}'
-              forceString: true
-            - name: cluster.environment
-              value: '{{ default "" (index . "environment") }}'
               forceString: true
             - name: remote.annotations.repo_url
               value: '{{ .metadata.annotations.repo_url }}'

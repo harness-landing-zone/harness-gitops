@@ -9,17 +9,16 @@
 #   mode: remote - Remote cluster registration: ESO ExternalSecret pulling
 #                  {server, caData, token} from a secret store into
 #                  Secret/<cluster.name>.
+# mode, tenant and environment are read straight from the cluster file.
 mode: local
+# Harness organization identifier (required for mode: local; optional for mode: remote).
+tenant: ""
+# Optional environment label (e.g. dev, test, prod).
+environment: ""
 
 cluster:
-  # DNS-1123 cluster Secret name (matches filename of clusters/<agent>/<cluster>.yaml).
+  # Set by fleet/clusters.yaml from the filename of clusters/<agent>/<cluster>.yaml.
   name: ""
-  # Owner agent name / namespace (matches parent folder clusters/<agent>/).
-  agent: ""
-  # Harness organization identifier (required for mode: local; optional for mode: remote).
-  tenant: ""
-  # Optional environment label (e.g. dev, test, prod).
-  environment: ""
 
 # --- mode: local settings ----------------------------------------------------
 local:

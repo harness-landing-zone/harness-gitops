@@ -16,14 +16,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if has $agentName (list "hub-cluster" "in-cluster" "hga-hub-agent" "hga-system") -}}
 {{- fail (printf "agent.name %q is reserved by the hub" $agentName) -}}
 {{- end -}}
-{{- $tenant := required "agent.tenant is required" $a.tenant -}}
+{{- $tenant := required "tenant is required" .Values.tenant -}}
 {{- if not (regexMatch $tenantRe $tenant) -}}
-{{- fail (printf "agent.tenant %q must use lowercase letters and digits only" $tenant) -}}
-{{- end -}}
-{{- with $a.environment -}}
-{{- if not (regexMatch $dns .) -}}
-{{- fail (printf "agent.environment %q must be a DNS-1123 label" .) -}}
-{{- end -}}
+{{- fail (printf "tenant %q must use lowercase letters and digits only" $tenant) -}}
 {{- end -}}
 {{- $_ := required "agent.identifier is required" $a.identifier -}}
 {{- $_ := required "agent.accountId is required" $a.accountId -}}

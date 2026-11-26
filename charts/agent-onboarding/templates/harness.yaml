@@ -14,7 +14,7 @@ spec:
   name: {{ $a.name | quote }}
   identifier: {{ $a.identifier | quote }}
   accountId: {{ $a.accountId | quote }}
-  orgId: {{ $a.tenant | quote }}
+  orgId: {{ .Values.tenant | quote }}
   operator: {{ default "ARGO" $a.operator | quote }}
   scope: ORG
   type: {{ default "MANAGED_ARGO_PROVIDER" $a.type | quote }}

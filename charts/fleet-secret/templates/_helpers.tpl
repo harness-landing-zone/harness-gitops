@@ -19,14 +19,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if has $name (list "hub-cluster" "in-cluster") -}}
 {{- fail (printf "cluster.name %q is reserved by the hub" $name) -}}
 {{- end -}}
-{{- with .Values.cluster.tenant -}}
+{{- with .Values.tenant -}}
 {{- if not (regexMatch $tenantRe .) -}}
-{{- fail (printf "cluster.tenant %q must use lowercase letters and digits only" .) -}}
+{{- fail (printf "tenant %q must use lowercase letters and digits only" .) -}}
 {{- end -}}
 {{- end -}}
-{{- with .Values.cluster.environment -}}
+{{- with .Values.environment -}}
 {{- if not (regexMatch $dns .) -}}
-{{- fail (printf "cluster.environment %q must be a DNS-1123 label" .) -}}
+{{- fail (printf "environment %q must be a DNS-1123 label" .) -}}
 {{- end -}}
 {{- end -}}
 {{- end }}
@@ -34,7 +34,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "fleet-secret.validateLocal" -}}
 {{- include "fleet-secret.validateCommon" . -}}
 {{- $dns := "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" -}}
-{{- $_ := required "cluster.tenant is required when mode is local" .Values.cluster.tenant -}}
+{{- $_ := required "tenant is required when mode is local" .Values.tenant -}}
 {{- $server := default "https://kubernetes.default.svc.cluster.local" .Values.local.server -}}
 {{- if eq $server "https://kubernetes.default.svc" -}}
 {{- fail "local.server cannot be https://kubernetes.default.svc (inClusterEnabled is false); use https://kubernetes.default.svc.cluster.local" -}}

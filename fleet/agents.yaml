@@ -72,17 +72,13 @@ applicationSets:
           releaseName: '{{ trimSuffix ".yaml" .path.filename }}-onboarding'
           ignoreMissingValueFiles: true
           valueFiles:
-            - '$values/values/agents/agent-onboarding/values.yaml'
             - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
+            # The agent file itself: tenant (and anything else) is read from here.
+            - '$values/{{ .path.path }}/{{ .path.filename }}'
+          # Only what is computed from the filename or the hub cluster Secret.
           parameters:
             - name: agent.name
               value: '{{ trimSuffix ".yaml" .path.filename }}'
-              forceString: true
-            - name: agent.tenant
-              value: '{{ .tenant }}'
-              forceString: true
-            - name: agent.environment
-              value: '{{ default "" (index . "environment") }}'
               forceString: true
             - name: agent.identifier
               value: '{{ trimSuffix ".yaml" .path.filename | replace "-" "_" }}'

@@ -1,7 +1,7 @@
 {{- if eq (default "local" .Values.mode) "local" }}
 {{- include "fleet-secret.validateLocal" . }}
 {{- $cluster := .Values.cluster.name }}
-{{- $tenant := .Values.cluster.tenant }}
+{{- $tenant := .Values.tenant }}
 {{- $deliverySA := printf "%s-delivery" $cluster }}
 {{- $deliveryToken := printf "%s-delivery-token" $cluster }}
 # Dedicated least-privilege delivery identity for this local cluster target.
