@@ -52,7 +52,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- fail (printf "teams.%s.destinations: server %q is forbidden; use explicit cluster URL or cluster name" $team .server) -}}
 {{- end -}}
 {{- /* name: "*" is allowed: this agent's Argo CD only sees clusters registered
-     into its own namespace (fleet-registration/<agent>/clusters/), so registration
+     into its own namespace (fleet-registration/<agent>/cluster-members/), so registration
      is the gate. */ -}}
 {{- if not (hasPrefix $prefix (default "" .namespace)) -}}
 {{- fail (printf "teams.%s.destinations: namespace %q must start with %q" $team .namespace $prefix) -}}

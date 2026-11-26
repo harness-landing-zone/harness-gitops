@@ -12,6 +12,6 @@ teams:
     namespaces:
       - team-b-apps
     destinations:
-      # Any cluster registered into this agent (fleet-registration/<agent>/clusters/).
+      # Any cluster registered into this agent (fleet-registration/<agent>/cluster-members/).
       - name: "*"
         namespace: team-b-*

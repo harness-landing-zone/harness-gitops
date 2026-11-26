@@ -3,7 +3,7 @@
 # The folder is the agent's immutable name AND its Kubernetes namespace
 # (bu1-dev; Harness agent bu1_dev). Managed by bootstrap/fleet-agents.yaml (official
 # upstream gitops-helm 1.3.0 with 0 ClusterRoles and 0 CRDs +
-# charts/agent-onboarding). Clusters it deploys to: clusters/*.yaml beside it.
+# charts/agent-onboarding). Clusters it deploys to: cluster-members/<cluster>.yaml beside it.
 # Deleting this file does not deregister the agent (create-update, preserve).
 tenant: bu1          # Harness organization identifier (^[a-z][a-z0-9]*$)
 environment: dev     # optional label

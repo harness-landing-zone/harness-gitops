@@ -1,8 +1,9 @@
-# Agent registrations: fleet-registration/<agent>/clusters/<cluster>.yaml
-# registers <cluster> into <agent> (folder = agent namespace, file name = the
-# Argo CD cluster Secret name there). mode in the file: local (default, target
-# is this hub) or remote. Deleting a file deregisters the cluster from that
-# agent (applicationsSync sync, no preserve).
+# Workload cluster members: fleet-registration/<agent>/cluster-members/
+# <cluster>.yaml (every agent except hga-hub-agent) adds <cluster> to <agent>
+# with least privilege (folder = agent
+# namespace, file name = the cluster, and the Argo CD cluster Secret name).
+# mode in the file: local (target is this hub) or remote. Deleting a file
+# removes the cluster from that agent (applicationsSync sync, no preserve).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -25,7 +26,10 @@ spec:
               repoURL: '{{ .metadata.annotations.repo_url }}'
               revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
               files:
-                - path: 'fleet-registration/*/clusters/*.yaml'
+                - path: 'fleet-registration/*/cluster-members/*.yaml'
+                # The PE admin agent's members are admin (fleet-members.yaml).
+                - path: 'fleet-registration/hga-hub-agent/cluster-members/*.yaml'
+                  exclude: true
   template:
     metadata:
       name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'

@@ -1,4 +1,4 @@
 # A spoke: workspace spoke-1, k3d cluster hga-spoke-1. Its admin connection
 # goes to OpenBao on the hub at clusters/spoke-1; the hub registers it from
-# fleet-registration/spoke-1.yaml.
+# fleet-registration/hga-hub-agent/cluster-members/spoke-1.yaml.
 role: spoke

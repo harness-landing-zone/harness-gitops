@@ -1,6 +1,6 @@
-# Org GitOps Agents: one per fleet-registration/<agent>/agent.yaml. The folder
-# is the agent's immutable name and its namespace (fleet-registration/bu1-dev/
-# -> namespace bu1-dev, Harness agent bu1_dev in org <tenant>): upstream
+# Workload agents: one per fleet-registration/<agent>/agent.yaml (every agent
+# folder except hga-hub-agent). The folder is the agent's immutable name and
+# its namespace (fleet-registration/bu1-dev/ -> namespace bu1-dev, Harness agent bu1_dev in org <tenant>): upstream
 # gitops-helm 1.3.0 (no ClusterRoles, no CRDs) + charts/agent-onboarding.
 # Deleting an agent.yaml never deregisters a live agent (create-update, preserve).
 apiVersion: argoproj.io/v1alpha1
@@ -26,6 +26,9 @@ spec:
               revision: '{{ default "HEAD" (index .metadata.annotations "repo_revision") }}'
               files:
                 - path: 'fleet-registration/*/agent.yaml'
+                # The PE admin agent is installed on Day 0 by tofu, not here.
+                - path: 'fleet-registration/hga-hub-agent/agent.yaml'
+                  exclude: true
   template:
     metadata:
       name: '{{ index .path.segments 1 }}'

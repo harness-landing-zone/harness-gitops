@@ -1,5 +1,5 @@
 # Registers one cluster Secret into an Argo CD / Harness GitOps Agent namespace,
-# driven by fleet-registration/<agent>/clusters/<cluster>.yaml:
+# driven by fleet-registration/<agent>/cluster-members/<cluster>.yaml:
 #
 #   mode: local  - Least-privilege target on this same cluster: Delivery SA +
 #                  token, team workload namespaces (PSA + Delete=false),
