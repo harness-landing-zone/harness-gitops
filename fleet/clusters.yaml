@@ -1,86 +1,19 @@
-# Cluster registrations: driven by one file per cluster in
-# clusters/<agent>/<cluster>.yaml.
-#
-#   - Parent folder (<agent>) is the target Agent's namespace (e.g. bu1-dev or
-#     hga-hub-agent). The same cluster can be registered into multiple agents.
-#   - Filename (<cluster>) is the Argo CD Cluster Secret name in that namespace.
-#   - Lifecycle is independent of agents/: preserveResourcesOnDeletion is false
-#     and applicationsSync is sync so deleting a cluster file removes its
-#     ExternalSecret and Argo CD Cluster Secret (while local team workload
-#     Namespaces stay protected with Delete=false).
+# Cluster registrations: one file per registration, clusters/<agent>/<cluster>.yaml.
+#   <agent>   folder   = the agent's namespace it registers into
+#   <cluster> filename = the Argo CD cluster Secret name in that namespace
+#   mode      in file  = local (default: target is this hub) or remote (via ESO store)
+# Deleting a file deregisters the cluster: applicationsSync sync, no preserve.
 applicationSets:
-  # Local restricted cluster targets (mode: local) — Delivery SA + team
-  # namespaces + least-privilege RoleBindings + local ESO SecretStore/Secret.
-  local:
+  registrations:
     selector:
       matchLabels:
         fleet_member: hub-cluster
     gitFiles: clusters/*/*.yaml
-    postSelector:
-      matchLabels:
-        mode: local
     name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
     labels:
       agent: '{{ index .path.segments 1 }}'
       cluster: '{{ trimSuffix ".yaml" .path.filename }}'
-      cluster_mode: local
-      tenant: '{{ .tenant }}'
-      environment: '{{ default "" (index . "environment") }}'
-    destination:
-      name: hub-cluster
-      namespace: '{{ index .path.segments 1 }}'
-    syncPolicyAppSet:
-      preserveResourcesOnDeletion: false
-      applicationsSync: sync
-    syncPolicy:
-      automated:
-        selfHeal: true
-        prune: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-    sources:
-      - ref: values
-      - path: charts/fleet-secret
-        helm:
-          releaseName: '{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
-          ignoreMissingValueFiles: true
-          valueFiles:
-            - '$values/values/clusters/fleet-secret/values.yaml'
-            - '$values/tenants/{{ .tenant }}/teams/*/values.yaml'
-            - '$values/{{ .path.path }}/{{ .path.filename }}'
-          parameters:
-            - name: mode
-              value: local
-              forceString: true
-            - name: cluster.name
-              value: '{{ trimSuffix ".yaml" .path.filename }}'
-              forceString: true
-            - name: cluster.agent
-              value: '{{ index .path.segments 1 }}'
-              forceString: true
-            - name: cluster.tenant
-              value: '{{ .tenant }}'
-              forceString: true
-            - name: cluster.environment
-              value: '{{ default "" (index . "environment") }}'
-              forceString: true
-
-  # Remote cluster targets (mode: remote) — registers an external cluster into
-  # any agent (including hga-hub-agent or an org agent) via ESO.
-  remote:
-    selector:
-      matchLabels:
-        fleet_member: hub-cluster
-    gitFiles: clusters/*/*.yaml
-    postSelector:
-      matchLabels:
-        mode: remote
-    name: 'cluster-{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
-    labels:
-      agent: '{{ index .path.segments 1 }}'
-      cluster: '{{ trimSuffix ".yaml" .path.filename }}'
-      cluster_mode: remote
+      cluster_mode: '{{ default "local" (index . "mode") }}'
       tenant: '{{ default "" (index . "tenant") }}'
       environment: '{{ default "" (index . "environment") }}'
     destination:
@@ -101,19 +34,15 @@ applicationSets:
       - path: charts/fleet-secret
         helm:
           releaseName: '{{ index .path.segments 1 }}-{{ trimSuffix ".yaml" .path.filename }}'
+          # A hub admin registration has no tenant, so the team glob may match
+          # nothing; that is the only reason missing files are allowed here.
           ignoreMissingValueFiles: true
           valueFiles:
-            - '$values/values/clusters/fleet-secret/values.yaml'
+            - '$values/tenants/{{ default "none" (index . "tenant") }}/teams/*/values.yaml'
             - '$values/{{ .path.path }}/{{ .path.filename }}'
           parameters:
-            - name: mode
-              value: remote
-              forceString: true
             - name: cluster.name
               value: '{{ trimSuffix ".yaml" .path.filename }}'
-              forceString: true
-            - name: cluster.agent
-              value: '{{ index .path.segments 1 }}'
               forceString: true
             - name: cluster.tenant
               value: '{{ default "" (index . "tenant") }}'
